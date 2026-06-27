@@ -9,7 +9,7 @@ from threading import Thread
 
 # НАСТРОЙКИ СИСТЕМЫ BSS
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
-NGROK_URL = "https://onrender.com"
+NGROK_URL = "https://ashram-game.onrender.com"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
