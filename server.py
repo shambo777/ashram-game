@@ -1,7 +1,7 @@
 import asyncio
 import os
 import sqlite3
-from flask import Flask, render_template_string, make_response, send_from_directory, request, jsonify
+from flask import Flask, make_response, send_from_directory, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,7 +10,6 @@ from threading import Thread
 # НАСТРОЙКИ СИСТЕМЫ BSS
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
 NGROK_URL = "https://ashram-game.onrender.com"
-URL = "https://ashram-game.onrender.com"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -62,13 +61,10 @@ def db_update_player(user_id, race=None, prana=None, room_lvl=None):
     conn.commit()
     conn.close()
 
-# ВЕБ-МАРШРУТЫ FLASK
-with open("index.html", "r", encoding="utf-8") as f:
-    html_layout = f.read()
-
+# ВЕБ-МАРШРУТЫ ДЛЯ СТАТИКИ И КАРТИНОК
 @app.route('/<path:filename>')
 def serve_static(filename):
-    if filename.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+    if filename.endswith(('.jpg', '.jpeg', '.png', '.webp', '.html', '.js', '.css')):
         return send_from_directory(os.getcwd(), filename)
     return "Файл не найден", 404
 
@@ -76,7 +72,7 @@ def serve_static(filename):
 def home():
     if request.method == "OPTIONS":
         return make_response("", 200)
-    response = make_response(render_template_string(html_layout))
+    response = make_response(send_from_directory(os.getcwd(), "index.html"))
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
 
@@ -158,6 +154,8 @@ MULTILEVEL_QUESTS = {
 }
 
 @dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    p = db_get_player(message.from_user.id)
 # МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
 MULTILEVEL_QUESTS = {
     "djinn_1": {
@@ -185,7 +183,7 @@ MULTILEVEL_QUESTS = {
         "buttons": [["1000 Маха-юг (4.32 млрд лет)", "ans_right_final"], ["100 Маха-юг", "ans_wrong"], ["1 миллион лет", "ans_wrong"]]
     },
     "nag_1": {
-        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его тело?»",
+        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его body?»",
         "buttons": [["Его стопы стали золотыми", "ans_wrong"], ["Его горло стало синим (Нилакантха)", "ans_right_nag_2"], ["Открылся четвертый глаз", "ans_wrong"]]
     },
     "nag_2": {
@@ -274,6 +272,15 @@ async def back_to_main(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
 # ГЛОБАЛЬНЫЙ ЗАПУСК С УЧЕТОМ ТРЕБОВАНИЙ ХОСТИНГА RENDER
+@dp.callback_query(lambda c: c.data == "back_main")
+async def back_to_main(callback: types.CallbackQuery):
+    p = db_get_player(callback.from_user.id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty")]
+    ])
+    await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
+
 # ГЛОБАЛЬНЫЙ ЗАПУСК С УЧЕТОМ ТРЕБОВАНИЙ ХОСТИНГА RENDER
 async def main():
     print("Запуск сервера Ашрама...")
