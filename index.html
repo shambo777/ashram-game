@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bholenath Sanga System - Ашрам</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        :root {
+            --bg-color: #0d0d13;
+            --card-bg: #13131a;
+            --border-color: #3a1c57;
+            --accent-color: #8a2be2;
+            --text-color: #e0e0e0;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 15px;
+            transition: all 0.5s ease;
+        }
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 0 25px rgba(138, 43, 226, 0.2);
+        }
+        h1 { color: #fff; font-size: 24px; margin: 10px 0 5px 0; }
+        .subtitle { color: #7f7f99; font-size: 13px; margin-bottom: 20px; }
+        .prana-badge {
+            background: rgba(0, 255, 204, 0.1);
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .race-select-screen { display: block; }
+        .game-screen { display: none; }
+        
+        .race-btn {
+            background: #1c1c27;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+        }
+        .race-icon { font-size: 24px; margin-right: 15px; }
+        .hero-avatar {
+            width: 100%;
+            max-height: 310px;
+            object-fit: cover;
+            border-radius: 15px;
+            border: 2px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        .room-card {
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            padding: 20px;
+            background: rgba(255,255,255,0.02);
+        }
+        .room-title { font-weight: bold; color: #ffbc42; font-size: 18px; }
+        .timer { font-size: 26px; color: #00ffcc; margin: 15px 0; font-weight: bold; }
+        
+        button.action-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+        button:disabled { background: #333 !important; color: #777 !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ЭКРАН ВЫБОРА РАСЫ -->
+    <div id="race-screen" class="race-select-screen">
+        <h1>Выберите вашу Расу</h1>
+        <div class="subtitle">Привязка аккаунта к Системе Bholenath Sanga</div>
+        
+        <button class="race-btn" onclick="selectRace('djinn')"><span class="race-icon">🔮</span><div><strong>Джинн Мустафа</strong></div></button>
+        <button class="race-btn" onclick="selectRace('mag')"><span class="race-icon">🧠</span><div><strong>Маг Афанасий</strong></div></button>
+        <button class="race-btn" onclick="selectRace('nag')"><span class="race-icon">🐍</span><div><strong>Наг Гавриил</strong></div></button>
+        <button class="race-btn" onclick="selectRace('leviafan')"><span class="race-icon">🔥</span><div><strong>Левиафан Дык</strong></div></button>
+    </div>
+
+    <!-- ОСНОВНОЙ ИГРОВОЙ ЭКРАН -->
+    <div id="game-screen" class="game-screen">
+        <h1 id="hero-name">Имя</h1>
+        <div id="race-tag" class="subtitle">Раса</div>
+        <div class="prana-badge">🧬 Баланс: <span id="prana-val">0</span> Праны</div>
+        
+        <img id="hero-img" src="" class="hero-avatar" alt="Герой">
+
+        <div class="room-card">
+            <div id="room-name" class="room-title">Комната</div>
+            <div id="room-level" style="margin-top:5px; color:#ffbc42;">Уровень: 1</div>
+            <div id="status-text" style="margin-top: 5px; font-size: 14px;">Статус: Готова к модернизации</div>
+            <div id="countdown" class="timer">00:00:00</div>
+            <button id="upgrade-btn" class="action-btn" onclick="startUpgrade()">Модернизировать (-50 Праны)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Берем ID игрока напрямую из Telegram
+    const userId = tg.initDataUnsafe?.user?.id || 999; 
+
+    let currentRace = '';
+    let timerInterval;
+
+    const raceSettings = {
+        djinn: { name: "Мустафа", tag: "Раса: Джинн", room: "🔮 Кальянная Лампа Сатьи", img: "mustafa.jpg", bg: "#110b18", card: "#191124", border: "#c6933a", accent: "#c6933a" },
+        mag: { name: "Афанасий", tag: "Раса: Маг Координации", room: "🌌 Гироскопическая Обсерватория", img: "afanasy.jpg", bg: "#091224", card: "#101b33", border: "#cca02e", accent: "#1e53b5" },
+        nag: { name: "Гавриил", tag: "Раса: Наг", room: "🐍 Модуль Спирали Фибоначчи", img: "gavriil.jpg", bg: "#05140b", card: "#0a1f12", border: "#2ecc71", accent: "#2ecc71" },
+        leviafan: { name: "Дык", tag: "Раса: Левиафан", room: "❄️ Крио-Камера Абсолютного Нуля", img: "dyk.jpg", bg: "#140a07", card: "#1f110c", border: "#d35400", accent: "#c0392b" }
+    };
+
+    // При входе запрашиваем у сервера прану и уровень комнаты
+    fetch(`/get_profile?user_id=${userId}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('prana-val').innerText = data.prana;
+            document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
+            if(data.race !== "Не выбрана") {
+                loadRaceInterface(data.race);
+            }
+        });
+
+    function selectRace(race) {
+        // Сохраняем расу на сервере
+        fetch('/save_race', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, race: race})
+        }).then(() => loadRaceInterface(race));
+    }
+
+    function loadRaceInterface(race) {
+        currentRace = race;
+        const set = raceSettings[race];
+        document.documentElement.style.setProperty('--bg-color', set.bg);
+        document.documentElement.style.setProperty('--card-bg', set.card);
+        document.documentElement.style.setProperty('--border-color', set.border);
+        document.documentElement.style.setProperty('--accent-color', set.accent);
+        
+        document.getElementById('hero-name').innerText = set.name;
+        document.getElementById('race-tag').innerText = set.tag;
+        document.getElementById('room-name').innerText = set.room;
+        document.getElementById('hero-img').src = set.img;
+        
+        document.getElementById('race-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+    }
+
+    function startUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 50) {
+            alert("Недостаточно Праны! Отправьтесь на дежурства в Telegram, чтобы собрать энергию.");
+            return;
+        }
+
+        const btn = document.getElementById('upgrade-btn');
+        const status = document.getElementById('status-text');
+        btn.disabled = true;
+        status.innerText = "Трансформация праны (Идет улучшение базы)...";
+
+        let timeLeft = 10; // 10 секунд для теста (замените на 21600 для реальных 6 часов)
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            let hrs = Math.floor(timeLeft / 3600);
+            let mins = Math.floor((timeLeft % 3600) / 60);
+            let secs = timeLeft % 60;
+            document.getElementById('countdown').innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('countdown').innerText = "00:00:00";
+                
+                // Отправляем запрос на сервер для списания праны и повышения уровня
+                fetch('/upgrade_room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: userId})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('prana-val').innerText = data.prana;
+                    document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
+                    status.innerText = "Модернизация завершена! Сектор Ашрама усилен.";
+                    btn.disabled = false;
+                });
+            }
+        }, 1000);
+    }
+</script>
+</body>
+</html>
