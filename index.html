@@ -20,7 +20,7 @@
             text-align: center;
             margin: 0;
             padding: 15px;
-            transition: all 0.5s ease;
+            padding-bottom: 80px; /* Отступ для нижнего меню */
         }
         .container {
             max-width: 420px;
@@ -45,51 +45,43 @@
         }
         .race-select-screen { display: block; }
         .game-screen { display: none; }
+        .tab-content { display: none; }
+        .active-tab { display: block; }
         
         .race-btn {
-            background: #1c1c27;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 12px;
-            cursor: pointer;
-            width: 100%;
-            text-align: left;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
+            background: #1c1c27; border: 1px solid #444; color: #fff;
+            padding: 15px; margin: 10px 0; border-radius: 12px;
+            cursor: pointer; width: 100%; text-align: left; font-size: 16px; display: flex; align-items: center;
         }
         .race-icon { font-size: 24px; margin-right: 15px; }
-        .hero-avatar {
-            width: 100%;
-            max-height: 310px;
-            object-fit: cover;
-            border-radius: 15px;
-            border: 2px solid var(--border-color);
-            margin-bottom: 15px;
-        }
-        .room-card {
+        .hero-avatar { width: 100%; max-height: 280px; object-fit: cover; border-radius: 15px; border: 2px solid var(--border-color); margin-bottom: 15px; }
+        
+        .room-card, .item-card {
             border: 1px solid var(--border-color);
-            border-radius: 15px;
-            padding: 20px;
-            background: rgba(255,255,255,0.02);
+            border-radius: 15px; padding: 15px;
+            background: rgba(255,255,255,0.02); margin-bottom: 15px; text-align: left;
         }
-        .room-title { font-weight: bold; color: #ffbc42; font-size: 18px; }
-        .timer { font-size: 26px; color: #00ffcc; margin: 15px 0; font-weight: bold; }
+        .room-title, .item-title { font-weight: bold; color: #ffbc42; font-size: 18px; }
+        .timer { font-size: 22px; color: #00ffcc; margin: 10px 0; font-weight: bold; text-align: center; }
         
         button.action-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 14px;
-            font-size: 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
+            background: var(--accent-color); color: white; border: none;
+            padding: 12px; font-size: 14px; border-radius: 8px;
+            cursor: pointer; width: 100%; font-weight: bold;
         }
         button:disabled { background: #333 !important; color: #777 !important; }
+
+        /* Нижнее меню переключения вкладок */
+        .nav-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #111118; border-top: 2px solid var(--border-color);
+            display: flex; justify-content: space-around; padding: 10px 0; z-index: 100;
+        }
+        .nav-btn {
+            background: none; border: none; color: #7f7f99;
+            font-size: 14px; cursor: pointer; font-weight: bold;
+        }
+        .nav-btn.active { color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.5); }
     </style>
 </head>
 <body>
@@ -99,7 +91,6 @@
     <div id="race-screen" class="race-select-screen">
         <h1>Выберите вашу Расу</h1>
         <div class="subtitle">Привязка аккаунта к Системе Bholenath Sanga</div>
-        
         <button class="race-btn" onclick="selectRace('djinn')"><span class="race-icon">🔮</span><div><strong>Джинн Мустафа</strong></div></button>
         <button class="race-btn" onclick="selectRace('mag')"><span class="race-icon">🧠</span><div><strong>Маг Афанасий</strong></div></button>
         <button class="race-btn" onclick="selectRace('nag')"><span class="race-icon">🐍</span><div><strong>Наг Гавриил</strong></div></button>
@@ -112,14 +103,36 @@
         <div id="race-tag" class="subtitle">Раса</div>
         <div class="prana-badge">🧬 Баланс: <span id="prana-val">0</span> Праны</div>
         
-        <img id="hero-img" src="" class="hero-avatar" alt="Герой">
+        <!-- ВКЛАДКА 1: БАЗА -->
+        <div id="tab-base" class="tab-content active-tab">
+            <img id="hero-img" src="" class="hero-avatar" alt="Герой">
+            <div class="room-card">
+                <div id="room-name" class="room-title">Комната</div>
+                <div id="room-level" style="color:#ffbc42; margin: 5px 0;">Уровень: 1</div>
+                <div id="status-text" style="font-size: 13px; color: #aaa;">Статус: Готова к трансформации</div>
+                <div id="countdown" class="timer">00:00:00</div>
+                <button id="upgrade-btn" class="action-btn" onclick="startUpgrade()">Модернизировать Базу (-50 Праны)</button>
+            </div>
+        </div>
 
-        <div class="room-card">
-            <div id="room-name" class="room-title">Комната</div>
-            <div id="room-level" style="margin-top:5px; color:#ffbc42;">Уровень: 1</div>
-            <div id="status-text" style="margin-top: 5px; font-size: 14px;">Статус: Готова к модернизации</div>
-            <div id="countdown" class="timer">00:00:00</div>
-            <button id="upgrade-btn" class="action-btn" onclick="startUpgrade()">Модернизировать (-50 Праны)</button>
+        <!-- ВКЛАДКА 2: АРТЕФАКТЫ КНИГИ -->
+        <div id="tab-items" class="tab-content">
+            <h3 style="color: #00ffcc; margin-top: 0;">Кузница Тонкого Плана</h3>
+            <p style="font-size: 12px; color: #7f7f99; margin-bottom: 15px;">Улучшайте артефакты снаряжения, чтобы повысить Координацию Системы.</p>
+            
+            <div class="item-card">
+                <div class="item-title">🛠️ Отвертка Афанасия «Сделано в СССР»</div>
+                <div style="font-size:12px; margin: 5px 0; color: #bbb;">Фокусирует гравитационные лучи. Увеличивает силу праны.</div>
+                <div id="item-lvl" style="color: #00ffcc; font-weight: bold; margin-bottom: 10px;">Текущая ковка: Уровень 1</div>
+                <div id="item-countdown" class="timer">00:00:00</div>
+                <button id="item-btn" class="action-btn" onclick="startItemUpgrade()">Запустить ковку артефакта (-70 Праны)</button>
+            </div>
+        </div>
+
+        <!-- НИЖНЯЯ НАВИГАЦИЯ -->
+        <div class="nav-bar">
+            <button id="btn-tab-base" class="nav-btn active" onclick="switchTab('base')">🏰 Келья</button>
+            <button id="btn-tab-items" class="nav-btn" onclick="switchTab('items')">📦 Снаряжение</button>
         </div>
     </div>
 </div>
@@ -128,11 +141,11 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Берем ID игрока напрямую из Telegram
-    const userId = tg.initDataUnsafe?.user?.id || 999; 
-
+    const userId = tg.initDataUnsafe?.user?.id || 777; 
+    const SERVER_URL = "https://onrender.com";
     let currentRace = '';
     let timerInterval;
+    let itemInterval;
 
     const raceSettings = {
         djinn: { name: "Мустафа", tag: "Раса: Джинн", room: "🔮 Кальянная Лампа Сатьи", img: "mustafa.jpg", bg: "#110b18", card: "#191124", border: "#c6933a", accent: "#c6933a" },
@@ -141,99 +154,26 @@
         leviafan: { name: "Дык", tag: "Раса: Левиафан", room: "❄️ Крио-Камера Абсолютного Нуля", img: "dyk.jpg", bg: "#140a07", card: "#1f110c", border: "#d35400", accent: "#c0392b" }
     };
 
-    // При входе запрашиваем у сервера прану и уровень комнаты
-      // Точный мировой адрес вашего сервера Render
-    const SERVER_URL = "https://ashram-game.onrender.com";
+    // Переключение вкладок База / Снаряжение
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(`tab-${tabName}`).style.display = 'block';
+        document.getElementById(`btn-tab-${tabName}`).classList.add('active');
+    }
 
-    // При входе запрашиваем у сервера прану и уровень комнаты
+    // Загрузка профиля
     fetch(`${SERVER_URL}/get_profile?user_id=${userId}`)
         .then(res => res.json())
         .then(data => {
             document.getElementById('prana-val').innerText = data.prana;
             document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
-            if(data.race !== "Не выбрана") {
-                loadRaceInterface(data.race);
-            }
-        }).catch(err => console.error("Ошибка загрузки профиля:", err));
+            if(data.race !== "Не выбрана") { loadRaceInterface(data.race); }
+        });
 
     function selectRace(race) {
-        // Сохраняем расу на сервере Render
         fetch(`${SERVER_URL}/save_race`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: userId, race: race})
-        })
-        .then(res => res.json())
-        .then(() => loadRaceInterface(race))
-        .catch(err => console.error("Ошибка сохранения расы:", err));
-    }
-
-    function loadRaceInterface(race) {
-        currentRace = race;
-        const set = raceSettings[race];
-        document.documentElement.style.setProperty('--bg-color', set.bg);
-        document.documentElement.style.setProperty('--card-bg', set.card);
-        document.documentElement.style.setProperty('--border-color', set.border);
-        document.documentElement.style.setProperty('--accent-color', set.accent);
-        
-        document.getElementById('hero-name').innerText = set.name;
-        document.getElementById('race-tag').innerText = set.tag;
-        document.getElementById('room-name').innerText = set.room;
-        document.getElementById('hero-img').src = set.img;
-        
-        document.getElementById('race-screen').style.display = 'none';
-        document.getElementById('game-screen').style.display = 'block';
-    }
-
-    function startUpgrade() {
-        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
-        if (currentPrana < 50) {
-            alert("Недостаточно Праны! Отправьтесь на дежурства в Telegram, чтобы собрать энергию.");
-            return;
-        }
-
-        const btn = document.getElementById('upgrade-btn');
-        const status = document.getElementById('status-text');
-        btn.disabled = true;
-        status.innerText = "Трансформация праны (Идет улучшение базы)...";
-
-        let timeLeft = 10; // 10 секунд для теста
-
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            let hrs = Math.floor(timeLeft / 3600);
-            let mins = Math.floor((timeLeft % 3600) / 60);
-            let secs = timeLeft % 60;
-            document.getElementById('countdown').innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                document.getElementById('countdown').innerText = "00:00:00";
-                
-                // Отправляем запрос на сервер Render для списания праны
-                fetch(`${SERVER_URL}/upgrade_room`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: userId})
-                })
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('prana-val').innerText = data.prana;
-                    document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
-                    status.innerText = "Модернизация завершена! Сектор Ашрама усилен.";
-                    btn.disabled = false;
-                }).catch(err => {
-                    alert("Ошибка при обновлении базы.");
-                    btn.disabled = false;
-                });
-            }
-        }, 1000);
-    }
-
-
-    function selectRace(race) {
-        // Сохраняем расу на сервере
-        fetch('/save_race', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({user_id: userId, race: race})
@@ -257,44 +197,76 @@
         document.getElementById('game-screen').style.display = 'block';
     }
 
+    // Таймер улучшения Базы
     function startUpgrade() {
         const currentPrana = parseInt(document.getElementById('prana-val').innerText);
-        if (currentPrana < 50) {
-            alert("Недостаточно Праны! Отправьтесь на дежурства в Telegram, чтобы собрать энергию.");
-            return;
-        }
+        if (currentPrana < 50) { alert("Недостаточно Праны!"); return; }
 
         const btn = document.getElementById('upgrade-btn');
         const status = document.getElementById('status-text');
         btn.disabled = true;
-        status.innerText = "Трансформация праны (Идет улучшение базы)...";
+    // Таймер улучшения Базы
+    function startUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 50) { alert("Недостаточно Праны!"); return; }
 
-        let timeLeft = 10; // 10 секунд для теста (замените на 21600 для реальных 6 часов)
+        const btn = document.getElementById('upgrade-btn');
+        const status = document.getElementById('status-text');
+        btn.disabled = true;
+        status.innerText = "Трансформация праны в секторе...";
 
+        let timeLeft = 10; // 10 сек для теста
         timerInterval = setInterval(() => {
             timeLeft--;
-            let hrs = Math.floor(timeLeft / 3600);
-            let mins = Math.floor((timeLeft % 3600) / 60);
-            let secs = timeLeft % 60;
+            let hrs = Math.floor(timeLeft / 3600), mins = Math.floor((timeLeft % 3600) / 60), secs = timeLeft % 60;
             document.getElementById('countdown').innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 document.getElementById('countdown').innerText = "00:00:00";
-                
-                // Отправляем запрос на сервер для списания праны и повышения уровня
-                fetch('/upgrade_room', {
+                fetch(`${SERVER_URL}/upgrade_room`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({user_id: userId})
-                })
-                .then(res => res.json())
-                .then(data => {
+                }).then(res => res.json()).then(data => {
                     document.getElementById('prana-val').innerText = data.prana;
                     document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
-                    status.innerText = "Модернизация завершена! Сектор Ашрама усилен.";
+                    status.innerText = "Модернизация завершена!";
                     btn.disabled = false;
-                });
+                }).catch(err => console.error("Ошибка улучшения базы:", err));
+            }
+        }, 1000);
+    }
+
+    // Таймер ковки артефакта снаряжения
+    function startItemUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 70) { alert("Недостаточно Праны для кузницы!"); return; }
+
+        const btn = document.getElementById('item-btn');
+        btn.disabled = true;
+
+        let timeLeft = 15; // 15 сек для быстрого теста анимации ковки
+        itemInterval = setInterval(() => {
+            timeLeft--;
+            let hrs = Math.floor(timeLeft / 3600), mins = Math.floor((timeLeft % 3600) / 60), secs = timeLeft % 60;
+            document.getElementById('item-countdown').innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (timeLeft <= 0) {
+                clearInterval(itemInterval);
+                document.getElementById('item-countdown').innerText = "00:00:00";
+                
+                // Списываем прану за кузницу артефактов через сервер
+                fetch(`${SERVER_URL}/upgrade_room`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: userId})
+                }).then(res => res.json()).then(data => {
+                    document.getElementById('prana-val').innerText = data.prana;
+                    document.getElementById('item-lvl').innerText = "Текущая ковка: Уровень 2 (Мощность +20%)";
+                    alert("Артефакт успешно перекован в кузнице Ашрама!");
+                    btn.disabled = false;
+                }).catch(err => console.error("Ошибка ковки:", err));
             }
         }, 1000);
     }
