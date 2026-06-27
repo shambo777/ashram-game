@@ -10,7 +10,7 @@ from threading import Thread
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
 NGROK_URL = "https://ashram-game.onrender.com"
 
-bot = Bot(token=TOKEN)
+bot = Bot(token=8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0)
 dp = Dispatcher()
 app = Flask(__name__)
 
