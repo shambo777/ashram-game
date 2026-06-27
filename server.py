@@ -8,7 +8,8 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
 # Токен вашего бота (вставьте ваш токен от @BotFather сюда)
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
-URL = "https://ashram-game.onrender.com"
+NGROK_URL = "https://ashram-game.onrender.com"
+
 
 
 bot = Bot(token=TOKEN)
