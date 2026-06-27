@@ -7,7 +7,6 @@ from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
 
-# НАСТРОЙКИ СИСТЕМЫ BSS
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
 NGROK_URL = "https://ashram-game.onrender.com"
 
