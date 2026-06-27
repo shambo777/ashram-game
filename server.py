@@ -1,4 +1,3 @@
-python 
 import asyncio
 import os
 import sqlite3
@@ -6,18 +5,17 @@ from flask import Flask, render_template_string, make_response, send_from_direct
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from threading import Thread
 
-# Токен вашего бота (вставьте ваш токен от @BotFather сюда)
+# НАСТРОЙКИ СИСТЕМЫ BSS
 TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
 NGROK_URL = "https://ashram-game.onrender.com"
-
-
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 app = Flask(__name__)
 
-# ИНИЦИАЛИЗАЦИЯ БД
+# ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ
 def init_db():
     conn = sqlite3.connect("ashram_game.db")
     cursor = conn.cursor()
@@ -95,7 +93,6 @@ def upgrade_room():
 
 # МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
 MULTILEVEL_QUESTS = {
-    # ------------------ ДЖИНН МУСТАФА ------------------
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
         "buttons": [["Гора Меру (Сумеру)", "ans_right_djinn_2"], ["Древо Иггдрасиль", "ans_wrong"], ["Змей Шеша-нага", "ans_wrong"]]
@@ -108,8 +105,6 @@ MULTILEVEL_QUESTS = {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 3): Контракт Времени\n\nЛярва вижжит. Мустафа достает древний свиток:\n«Финальный рубеж. Махабхарата гласит, что время в материальном мире циклично. Какова общая продолжительность всех четырех Юг (Сатья, Трета, Двапара и Кали), составляющих вместе одну Маха-югу в исчислении лет смертных?»",
         "buttons": [["4 320 000 лет", "ans_right_final"], ["1 200 000 лет", "ans_wrong"], ["100 000 000 лет", "ans_wrong"]]
     },
-
-    # ------------------ МАГ АФАНАСИЙ ------------------
     "mag_1": {
         "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 1): Матрица Координации\n\nАфанасий направляет советскую отвертку на разрыв ЛЭП УМПО. Его три головы произносят в унисон:\n«Для стабилизации гравитационного луча нужен нумерологический код. Из скольких глав состоит Бхагавад-Гита, поведанная Кришной Арджуне на поле Курукшетра?»",
         "buttons": [["12 глав", "ans_wrong"], ["18 глав", "ans_right_mag_2"], ["108 глав", "ans_wrong"]]
@@ -122,8 +117,6 @@ MULTILEVEL_QUESTS = {
         "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 3): Код Создателя\n\nРазрыв ЛЭП почти затянут, гравитация колеблется. Афанасий требует высший ответ:\n«Ведическая космология описывает Творца нашей Вселенной — Брахму. Но у него есть предел жизни. Сколько длится один день Брахмы (Калпа) в Тонком Плане, равный одной дневной манифестации творения?»",
         "buttons": [["1000 Маха-юг (4.32 млрд лет)", "ans_right_final"], ["100 Маха-юг", "ans_wrong"], ["1 миллион лет", "ans_wrong"]]
     },
-
-    # ------------------ НАГ ГАВРИИЛ ------------------
     "nag_1": {
         "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его тело?»",
         "buttons": [["Его стопы стали золотыми", "ans_wrong"], ["Его горло стало синим (Нилакантха)", "ans_right_nag_2"], ["Открылся четвертый глаз", "ans_wrong"]]
@@ -136,8 +129,6 @@ MULTILEVEL_QUESTS = {
         "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 3): Алтарь Шивы\n\nМногоножки Забвения рассеиваются. Гавриил подводит вас к тонкоматериальному Алтарю:\n«Финальный вопрос Шива Пураны. Назовите священную ночь, когда преданные бодрствуют и медитируют на трансцендентный танец Господа Шивы (Тандава), разрушающий невежество?»",
         "buttons": [["Махашиваратри", "ans_right_final"], ["Дивали", "ans_wrong"], ["Холи", "ans_wrong"]]
     },
-
-    # ------------------ ЛЕВИАФАН ДЫК ------------------
     "leviafan_1": {
         "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 1): Абсолютный Контроль\n\nДык воет на луну, его крио-доспехи гудят, защищая души Николая и Весемира:\n«Разум должен быть холодным, как Абсолютный Ноль! Ответь на вопрос из Вишну Пураны. Назови великого преданного мальчика, которого Нараяна защищал от всех смертельных казней его собственного отца Хираньякашипу?»",
         "buttons": [["Махараджа Прахлада", "ans_right_leviafan_2"], ["Царевич Дхрува", "ans_wrong"], ["Принц Бхишма", "ans_wrong"]]
@@ -161,4 +152,9 @@ async def cmd_start(message: types.Message):
     ])
     await message.answer(
         f"Приветствую, {message.from_user.first_name}!\n\nСистема 'Bholenath Sanga' активна.\n"
-Используйте код с осторожностью.f"Ваш текущий баланс: {p['prana']} Праны. Уровень кельи: {p['room_lvl']}.\n\nВыберите действие:",reply_markup=kb)@dp.callback_query(lambda c: c.data == "start_duty")async def start_duty_menu(callback: types.CallbackQuery):kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔮 Джинн Мустафа", callback_data="runquest_djinn_1")],[InlineKeyboardButton(text="🧠 Маг Афанасий", callback_data="runquest_mag_1")],[InlineKeyboardButton(text="🐍 Наг Гавриил", callback_data="runquest_nag_1")],[InlineKeyboardButton(text="🔥 Левиафан Дык", callback_data="runquest_leviafan_1")]])await callback.message.edit_text("С кем из хранителей Системы вы разделите ночное дежурство?", reply_markup=kb)@dp.callback_query(lambda c: c.data.startswith("runquest_"))async def handle_quests(callback: types.CallbackQuery):quest_key = callback.data.replace("runquest_", "")quest_data = MULTILEVEL_QUESTS.get(quest_key)if quest_data:kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=t, callback_data=f"ans_{c}")] for t, c in quest_data["buttons"]])await callback.message.edit_text(quest_data["text"], reply_markup=kb)@dp.callback_query(lambda c: c.data.startswith("ans_"))async def handle_answers(callback: types.CallbackQuery):user_id = callback.from_user.idaction = callback.data.replace("ans_", "")if action == "wrong":kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Попробовать снова", callback_data="start_duty")]])await callback.message.edit_text("❌ ИСКАЖЕНИЕ СИСТЕМЫ...\n\nОтвет неверен. Ум поддался иллюзиям Кали-Юги. Настройте Координацию и попробуйте дежурство заново!", reply_markup=kb)elif action.startswith("right_") and action.endswith(("2", "3")):# Переход на следующий уровень квеста того же герояnext_step = action.replace("right", "")kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Продолжить дежурство ➡️", callback_data=f"runquest{next_step}")]])await callback.message.edit_text("✨ ИСТИНА ОТКРЫТА! Вы успешно запечатали текущий сектор подпространства. Но паразиты наступают дальше...", reply_markup=kb)elif action == "right_final":# Успешное завершение всей цепочки!p = db_get_player(user_id)new_prana = p["prana"] + 300  # Жирный куш за прохождение цикла!db_update_player(user_id, prana=new_prana)kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="В штаб Ашрама 🏰", callback_data="back_main")]])await callback.message.edit_text(f"🎉 ПОЛНАЯ ПОБЕДА НАД ПОДПЛАНАМИ!\n\nВы полностью очистили сектор ЛЭП, проявив глубочайшие ведические знания. Система BSS стабилизирована.\n\nНаграда: +300 Праны!\nБаланс: {new_prana} Праны.", reply_markup=kb)@dp.callback_query(lambda c: c.data == "back_main")async def back_to_main(callback: types.CallbackQuery):p = db_get_player(callback.from_user.id)kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))],[InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty")]])await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)async def main():print("Запуск сервера Ашрама и Базы Данных...")from threading import ThreadThread(target=lambda: app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)).start()await bot.delete_webhook(drop_pending_updates=True)print("Бот BSS успешно запущен!")await dp.start_polling(bot)if name == "main":asyncio.run(main())
+        f"Ваш текущий баланс: {p['prana']} Праны. Уровень кельи: {p['room_lvl']}.\n\nВыберите действие:",
+        reply_markup=kb
+    )
+
+@dp.callback_query(lambda c: c.data == "start_duty")
+async def start_duty_menu(callback: types.CallbackQuery):kb = InlineKeyboardMarkup(inline_keyboard=[(InlineKeyboardButton(text="🔮 Джинн Мустафа", callback_data="runquest_djinn_1")),(InlineKeyboardButton(text="🧠 Маг Афанасий", callback_data="runquest_mag_1")),(InlineKeyboardButton(text="🐍 Наг Гавриил", callback_data="runquest_nag_1")),(InlineKeyboardButton(text="🔥 Левиафан Дык", callback_data="runquest_leviafan_1"))])await callback.message.edit_text("С кем из хранителей Системы вы разделите ночное дежурство?", reply_markup=kb)@dp.callback_query(lambda c: c.data.startswith("runquest_"))async def handle_quests(callback: types.CallbackQuery):quest_key = callback.data.replace("runquest_", "")quest_data = MULTILEVEL_QUESTS.get(quest_key)if quest_data:kb = InlineKeyboardMarkup(inline_keyboard=[(InlineKeyboardButton(text=t, callback_data=f"ans_{c}")) for t, c in quest_data("buttons"))await callback.message.edit_text(quest_data("text"), reply_markup=kb)@dp.callback_query(lambda c: c.data.startswith("ans_"))async def handle_answers(callback: types.CallbackQuery):user_id = callback.from_user.idaction = callback.data.replace("ans_", "")if action == "wrong":kb = InlineKeyboardMarkup(inline_keyboard=[(InlineKeyboardButton(text="Попробовать снова", callback_data="start_duty")))await callback.message.edit_text("❌ ИСКАЖЕНИЕ СИСТЕМЫ...\n\nОтвет неверен. Ум поддался иллюзиям Кали-Юги. Настройте Координацию и попробуйте дежурство заново!", reply_markup=kb)elif action.startswith("right_") and (action.endswith("2") or action.endswith("3")):next_step = action.replace("right", "")kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Продолжить дежурство ➡️", callback_data=f"runquest{next_step}")]])await callback.message.edit_text("✨ ИСТИНА ОТКРЫТА! Вы успешно запечатали текущий сектор подпространства. Но паразиты наступают дальше...", reply_markup=kb)elif action == "right_final":p = db_get_player(user_id)new_prana = p("prana") + 300db_update_player(user_id, prana=new_prana)kb = InlineKeyboardMarkup(inline_keyboard=[(InlineKeyboardButton(text="В штаб Ашрама 🏰", callback_data="back_main")))await callback.message.edit_text(f"🎉 ПОЛНАЯ ПОБЕДА НАД ПОДПЛАНАМИ!\n\nВы полностью очистили сектор ЛЭП, проявив глубочайшие ведические знания. Система BSS стабилизирована.\n\nНаграда: +300 Праны!\nБаланс: {new_prana} Праны.", reply_markup=kb)@dp.callback_query(lambda c: c.data == "back_main")async def back_to_main(callback: types.CallbackQuery):p = db_get_player(callback.from_user.id)kb = InlineKeyboardMarkup(inline_keyboard=[(InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))),(InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty"))])await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p('prana')} Праны.", reply_markup=kb)
