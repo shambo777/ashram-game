@@ -142,7 +142,11 @@
     };
 
     // При входе запрашиваем у сервера прану и уровень комнаты
-    fetch(`/get_profile?user_id=${userId}`)
+      // Точный мировой адрес вашего сервера Render
+    const SERVER_URL = "https://ashram-game.onrender.com";
+
+    // При входе запрашиваем у сервера прану и уровень комнаты
+    fetch(`${SERVER_URL}/get_profile?user_id=${userId}`)
         .then(res => res.json())
         .then(data => {
             document.getElementById('prana-val').innerText = data.prana;
@@ -150,7 +154,82 @@
             if(data.race !== "Не выбрана") {
                 loadRaceInterface(data.race);
             }
-        });
+        }).catch(err => console.error("Ошибка загрузки профиля:", err));
+
+    function selectRace(race) {
+        // Сохраняем расу на сервере Render
+        fetch(`${SERVER_URL}/save_race`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, race: race})
+        })
+        .then(res => res.json())
+        .then(() => loadRaceInterface(race))
+        .catch(err => console.error("Ошибка сохранения расы:", err));
+    }
+
+    function loadRaceInterface(race) {
+        currentRace = race;
+        const set = raceSettings[race];
+        document.documentElement.style.setProperty('--bg-color', set.bg);
+        document.documentElement.style.setProperty('--card-bg', set.card);
+        document.documentElement.style.setProperty('--border-color', set.border);
+        document.documentElement.style.setProperty('--accent-color', set.accent);
+        
+        document.getElementById('hero-name').innerText = set.name;
+        document.getElementById('race-tag').innerText = set.tag;
+        document.getElementById('room-name').innerText = set.room;
+        document.getElementById('hero-img').src = set.img;
+        
+        document.getElementById('race-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+    }
+
+    function startUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 50) {
+            alert("Недостаточно Праны! Отправьтесь на дежурства в Telegram, чтобы собрать энергию.");
+            return;
+        }
+
+        const btn = document.getElementById('upgrade-btn');
+        const status = document.getElementById('status-text');
+        btn.disabled = true;
+        status.innerText = "Трансформация праны (Идет улучшение базы)...";
+
+        let timeLeft = 10; // 10 секунд для теста
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            let hrs = Math.floor(timeLeft / 3600);
+            let mins = Math.floor((timeLeft % 3600) / 60);
+            let secs = timeLeft % 60;
+            document.getElementById('countdown').innerText = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('countdown').innerText = "00:00:00";
+                
+                // Отправляем запрос на сервер Render для списания праны
+                fetch(`${SERVER_URL}/upgrade_room`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: userId})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('prana-val').innerText = data.prana;
+                    document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
+                    status.innerText = "Модернизация завершена! Сектор Ашрама усилен.";
+                    btn.disabled = false;
+                }).catch(err => {
+                    alert("Ошибка при обновлении базы.");
+                    btn.disabled = false;
+                });
+            }
+        }, 1000);
+    }
+
 
     function selectRace(race) {
         // Сохраняем расу на сервере
