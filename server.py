@@ -1,21 +1,28 @@
 import asyncio
 import os
 import sqlite3
+import logging
 from flask import Flask, make_response, send_from_directory, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
 
-# НАСТРОЙКИ СИСТЕМЫ BSS
-TOKEN = "8858569814:AAEGD4sMWYmVEur5jREoDq5UGGX8bsMcLU0"
+# Включаем логирование, чтобы видеть ошибки в панели Render
+logging.basicConfig(level=logging.INFO)
+
+# БЕЗОПАСНОЕ СЧИТЫВАНИЕ ТОКЕНА ИЗ СЕКРЕТОВ ХОСТИНГА
+TOKEN = os.environ.get("BOT_TOKEN")
 NGROK_URL = "https://ashram-game.onrender.com"
 
-bot = Bot(token=TOKEN)
+if not TOKEN:
+    print("КРИТИЧЕСКАЯ ОШИБКА: Переменная BOT_TOKEN не найдена в настройках Render!")
+
+bot = Bot(token=TOKEN) if TOKEN else None
 dp = Dispatcher()
 app = Flask(__name__)
 
-# ЕДИНАЯ ГЛОБАЛЬНАЯ БАЗА ДАННЫХ В ПАМЯТИ ДЛЯ ОБХОДА БЛОКИРОВОК RENDER
+# ЕДИНАЯ ГЛОБАЛЬНАЯ БАЗА ДАННЫХ В ПАМЯТИ
 CONN = sqlite3.connect(":memory:", check_same_thread=False)
 
 def init_db():
@@ -44,15 +51,11 @@ def db_get_player(user_id):
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
     cursor = CONN.cursor()
-    if race is not None: 
-        cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
-    if prana is not None: 
-        cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
-    if room_lvl is not None: 
-        cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
+    if race is not None: cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
+    if prana is not None: cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
+    if room_lvl is not None: cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
     CONN.commit()
 
-# НАСТРОЙКА CORS ДЛЯ БЕЗОПАСНОСТИ ТЕЛЕФОНОВ
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -60,7 +63,6 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     return response
 
-# ВЕБ-МАРШРУТЫ ДЛЯ СТАТИКИ И КАРТИНОК
 @app.route('/<path:filename>')
 def serve_static(filename):
     if filename.endswith(('.jpg', '.jpeg', '.png', '.webp', '.html', '.js', '.css')):
@@ -69,8 +71,7 @@ def serve_static(filename):
 
 @app.route("/")
 def home():
-    if request.method == "OPTIONS":
-        return make_response("", 200)
+    if request.method == "OPTIONS": return make_response("", 200)
     response = make_response(send_from_directory(os.getcwd(), "index.html"))
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
@@ -101,7 +102,6 @@ def upgrade_room():
         return jsonify({"prana": new_prana, "room_lvl": new_lvl})
     return jsonify({"error": "No prana"}), 400
 
-# МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
 MULTILEVEL_QUESTS = {
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
@@ -155,7 +155,6 @@ MULTILEVEL_QUESTS = {
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    p = db_get_player(message.from_user.id)
 # МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
 MULTILEVEL_QUESTS = {
     "djinn_1": {
@@ -212,8 +211,8 @@ MULTILEVEL_QUESTS = {
 async def cmd_start(message: types.Message):
     p = db_get_player(message.from_user.id)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))],
-        [InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty")]
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=NGROK_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство", callback_data="start_duty")]
     ])
     await message.answer(
         f"Приветствую, {message.from_user.first_name}!\n\nСистема 'Bholenath Sanga' активна.\n"
@@ -248,61 +247,55 @@ async def handle_answers(callback: types.CallbackQuery):
     
     if action == "wrong":
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Попробовать снова", callback_data="start_duty")]])
-        await callback.message.edit_text("❌ ИСКАЖЕНИЕ СИСТЕМЫ...\n\nОтвет неверен. Ум поддался иллюзиям Кали-Юги. Настройте Координацию и попробуйте дежурство заново!", reply_markup=kb)
+        await callback.message.edit_text("❌ ИСКАЖЕНИЕ СИСТЕМЫ...\n\nОтвет неверен. Ум поддался иллюзиям Кали-Юги. Попробуйте дежурство заново!", reply_markup=kb)
     
     elif action.startswith("right_") and (action.endswith("_2") or action.endswith("_3")):
         next_step = action.replace("right_", "")
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Продолжить дежурство ➡️", callback_data=f"runquest_{next_step}")]])
-        await callback.message.edit_text("✨ ИСТИНА ОТКРЫТА! Вы успешно запечатали текущий сектор подпространства. Но паразиты наступают дальше...", reply_markup=kb)
+        await callback.message.edit_text("✨ ИСТИНА ОТКРЫТА! Сектор подпространства временно чист. Но паразиты наступают дальше...", reply_markup=kb)
         
     elif action == "right_final":
         p = db_get_player(user_id)
         new_prana = p["prana"] + 300
         db_update_player(user_id, prana=new_prana)
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="В штаб Ашрама 🏰", callback_data="back_main")]])
-        await callback.message.edit_text(f"🎉 ПОЛНАЯ ПОБЕДА НАД ПОДПЛАНАМИ!\n\nВы полностью очистили сектор ЛЭП, проявив глубочайшие ведические знания. Система BSS стабилизирована.\n\nНаграда: +300 Праны!\nБаланс: {new_prana} Праны.", reply_markup=kb)
+        await callback.message.edit_text(f"🎉 ПОЛНАЯ ПОБЕДА НАД ПОДПЛАНАМИ!\n\nВы полностью очистили сектор ЛЭП УМПО, проявив ведические знания. Система стабилизирована.\n\nНаграда: +300 Праны!\nБаланс: {new_prana} Праны.", reply_markup=kb)
 
 @dp.callback_query(lambda c: c.data == "back_main")
 async def back_to_main(callback: types.CallbackQuery):
     p = db_get_player(callback.from_user.id)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))],
-        [InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty")]
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=NGROK_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство", callback_data="start_duty")]
     ])
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
-# ГЛОБАЛЬНЫЙ ЗАПУСК С УЧЕТОМ ТРЕБОВАНИЙ ХОСТИНГА RENDER
-@dp.callback_query(lambda c: c.data == "back_main")
-async def back_to_main(callback: types.CallbackQuery):
-    p = db_get_player(callback.from_user.id)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏰 Войти в Ашрам (База)", web_app=WebAppInfo(url=NGROK_URL))],
-        [InlineKeyboardButton(text="⚔️ Начать дежурство (Квесты)", callback_data="start_duty")]
-    ])
-    await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
-
-# ИСПРАВЛЕННЫЙ ПАРАЛЛЕЛЬНЫЙ ЗАПУСК ДЛЯ ОБЛАКА RENDER
 def start_bot_in_thread():
-    # Создаем новый независимый поток для Telegram-бота
+    if not bot: return
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
+@dp.callback_query(lambda c: c.data == "back_main")
+async def back_to_main(callback: types.CallbackQuery):
+    p = db_get_player(callback.from_user.id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=NGROK_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство", callback_data="start_duty")]
+    ])
+    await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
+
+def start_bot_in_thread():
+    if not bot: return
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     async def run_bot():
         await bot.delete_webhook(drop_pending_updates=True)
-        print("Бот BSS успешно подключился к серверам Telegram!")
         await dp.start_polling(bot)
-        
     loop.run_until_complete(run_bot())
 
 async def main():
-    print("Запуск инфраструктуры Ашрама...")
     port = int(os.environ.get("PORT", 5000))
-    
-    # 1. Сначала запускаем бота в отдельном безопасном потоке
-    Thread(target=start_bot_in_thread, daemon=True).start()
-    
-    # 2. Затем запускаем Flask-сервер в основном потоке (этого требует Render)
-    print("Веб-сервер Flask развернут на порту:", port)
+    if bot:
+        Thread(target=start_bot_in_thread, daemon=True).start()
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
