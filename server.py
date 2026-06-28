@@ -6,7 +6,6 @@ from flask import Flask, make_response, send_from_directory, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from asgiref.sync import async_to_sync
 
 logging.basicConfig(level=logging.INFO)
 
@@ -97,27 +96,18 @@ def upgrade_room():
     return jsonify({"error": "No prana"}), 400
 
 @app.route("/webhook", methods=["POST"])
-# АВТОНОМНЫЙ ШЛЮЗ ОБРАБОТКИ СИГНАЛОВ
-def run_async_update(update_json):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        update = types.Update.model_validate(update_json, context={"bot": bot})
-        loop.run_until_complete(dp.feed_update(bot, update))
-    except Exception as e:
-        logging.error(f"Ошибка внутри асинхронного цикла: {e}")
-    finally:
-        loop.close()
-
-@app.route("/webhook", methods=["POST"])
 def webhook_handler():
     if bot:
-        # Берем чистый JSON и передаем его в поток напрямую через лямбда-выражение
-        data_json = request.json
-        Thread(target=lambda: run_async_update(data_json), daemon=True).start()
+        try:
+            update = types.Update.model_validate(request.json, context={"bot": bot})
+            # Создаём изолированный запуск для каждой сессии
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(dp.feed_update(bot, update))
+            loop.close()
+        except Exception as e:
+            logging.error(f"Шлюз: {e}")
     return "OK", 200
-
-
 MULTILEVEL_QUESTS = {
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
@@ -235,7 +225,9 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if bot:
         try:
-            asyncio.run(bot.set_webhook(url=f"{RENDER_URL}/webhook", drop_pending_updates=True))
+            # Чистим старые сессии перед привязкой
+            asyncio.run(bot.delete_webhook(drop_pending_updates=True))
+            asyncio.run(bot.set_webhook(url=f"{RENDER_URL}/webhook"))
             logging.info("Сетевой мост Webhook успешно развернут!")
         except Exception as e:
             logging.error(f"Ошибка шлюза: {e}")
