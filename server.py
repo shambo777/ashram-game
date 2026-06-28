@@ -97,14 +97,26 @@ def upgrade_room():
     return jsonify({"error": "No prana"}), 400
 
 @app.route("/webhook", methods=["POST"])
+# ИЗОЛИРОВАННЫЙ ФОНОВЫЙ ПОТОК ДЛЯ ОБРАБОТКИ СИГНАЛОВ TELEGRAM
+def run_async_update(update_json):
+    # Создаем вечный изолированный цикл для этой конкретной команды
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    async def process():
+        update = types.Update.model_validate(update_json, context={"bot": bot})
+        await dp.feed_update(bot, update)
+        
+    loop.run_until_complete(process())
+    loop.close()
+
+@app.route("/webhook", methods=["POST"])
 def webhook_handler():
     if bot:
-        try:
-            update = types.Update.model_validate(request.json, context={"bot": bot})
-            async_to_sync(dp.feed_update)(bot, update)
-        except Exception as e:
-            logging.error(f"Ошибка шлюза: {e}")
+        # Запускаем обработку квеста в фоновом потоке, чтобы Flask мгновенно освобождал Event Loop
+        Thread(target=run_async_update, args=(request.json,), daemon=True).start()
     return "OK", 200
+
 MULTILEVEL_QUESTS = {
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
