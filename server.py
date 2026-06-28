@@ -17,9 +17,7 @@ bot = Bot(token=TOKEN) if TOKEN else None
 dp = Dispatcher()
 app = Flask(__name__)
 
-CONN = sqlite3.connect(":memory:", check_same_thread=False)
-
-# ИСТИННАЯ БАЗА ДАННЫХ НА ДИСКЕ ХОСТИНГА (НЕ СТИРАЕТСЯ)
+# ПОСТОЯННАЯ БАЗА ДАННЫХ НА ДИСКЕ СЕРВЕРА
 DB_PATH = "ashram_game.db"
 
 def init_db():
@@ -39,39 +37,46 @@ def init_db():
 init_db()
 
 def db_get_player(user_id):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT race, prana, room_lvl FROM players WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    if not row:
-        cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
-        conn.commit()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT race, prana, room_lvl FROM players WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
         conn.close()
+        
+        if not row:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
+            conn.commit()
+            conn.close()
+            return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
+            
+        # ЖЕСТКАЯ ПОДСТРАХОВКА: Достаем элементы строго по номерам из ячеек базы
+        return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
+    except Exception as e:
+        logging.error(f"Ошибка чтения БД: {e}")
         return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
-    conn.close()
-    # ИСПРАВЛЕНО: Извлекаем данные строго по индексам из кортежа
-    return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM players WHERE user_id = ?", (user_id,))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM players WHERE user_id = ?", (user_id,))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
+            conn.commit()
+            
+        if race is not None: 
+            cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (str(race), user_id))
+        if prana is not None: 
+            cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (int(prana), user_id))
+        if room_lvl is not None: 
+            cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (int(room_lvl), user_id))
         conn.commit()
-        
-    if race is not None: 
-        cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (str(race), user_id))
-    if prana is not None: 
-        cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (int(prana), user_id))
-    if room_lvl is not None: 
-        cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (int(room_lvl), user_id))
-    conn.commit()
-    conn.close()
-
-
-
-
+        conn.close()
+    except Exception as e:
+        logging.error(f"Ошибка записи БД: {e}")
 
 @app.after_request
 def add_cors_headers(response):
@@ -88,7 +93,6 @@ def serve_static(filename):
 
 @app.route("/")
 def home():
-    if request.method == "OPTIONS": return make_response("", 200)
     response = make_response(send_from_directory(os.getcwd(), "index.html"))
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
@@ -105,7 +109,6 @@ def save_race():
     data = request.json
     db_update_player(int(data["user_id"]), race=data["race"])
     return jsonify({"status": "success"})
-
 
 @app.route("/upgrade_room", methods=["POST", "OPTIONS"])
 def upgrade_room():
@@ -232,13 +235,11 @@ async def back_to_main(callback: types.CallbackQuery):
     ])
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
-# БЕЗОПАСНЫЙ НЕЗАВИСИМЫЙ ПОТОК ДЛЯ ПОЛЛИНГА
 def start_polling_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     async def poll():
         await bot.delete_webhook(drop_pending_updates=True)
-        # handle_signals=False отключает перехват сигналов и убирает ошибку потоков
         await dp.start_polling(bot, handle_signals=False)
     loop.run_until_complete(poll())
 
@@ -248,4 +249,3 @@ if __name__ == "__main__":
         Thread(target=start_polling_thread, daemon=True).start()
         logging.info("Фоновый поток Поллинга успешно активирован!")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-
