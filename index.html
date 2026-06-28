@@ -135,17 +135,19 @@
     </div>
 </div>
 <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+     // МЯГКАЯ ПОДСТРАХОВКА: Проверяем наличие Telegram, чтобы браузеры не выдавали ошибку
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    
+    if (tg) {
+        tg.expand();
+    }
 
+    // Безопасное считывание ID пользователя
     let userId = 777;
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
         userId = tg.initDataUnsafe.user.id;
     }
 
-    let currentRace = '';
-    let timerInterval;
-    let itemInterval;
 
     const raceSettings = {
         djinn: { name: "Мустафа", tag: "Раса: Джинн", room: "🔮 Кальянная Лампа Сатьи", img: "mustafa.jpg", bg: "#110b18", card: "#191124", border: "#c6933a", accent: "#c6933a" },
