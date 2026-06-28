@@ -141,8 +141,13 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const userId = tg.initDataUnsafe?.user?.id || 777; 
-    const SERVER_URL = "https://onrender.com";
+        // Абсолютно безопасный способ считывания ID для любых старых телефонов
+    let userId = 777;
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+        userId = tg.initDataUnsafe.user.id;
+    }
+
+    const SERVER_URL = "https://ashram-game.onrender.com";
     let currentRace = '';
     let timerInterval;
     let itemInterval;
