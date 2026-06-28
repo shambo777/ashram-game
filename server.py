@@ -6,6 +6,7 @@ from flask import Flask, make_response, send_from_directory, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from threading import Thread
 
 logging.basicConfig(level=logging.INFO)
 
@@ -94,20 +95,6 @@ def upgrade_room():
         db_update_player(user_id, prana=new_prana, room_lvl=new_lvl)
         return jsonify({"prana": new_prana, "room_lvl": new_lvl})
     return jsonify({"error": "No prana"}), 400
-
-@app.route("/webhook", methods=["POST"])
-def webhook_handler():
-    if bot:
-        try:
-            update = types.Update.model_validate(request.json, context={"bot": bot})
-            # Создаём изолированный запуск для каждой сессии
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(dp.feed_update(bot, update))
-            loop.close()
-        except Exception as e:
-            logging.error(f"Шлюз: {e}")
-    return "OK", 200
 MULTILEVEL_QUESTS = {
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
@@ -221,14 +208,20 @@ async def back_to_main(callback: types.CallbackQuery):
     ])
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
+# БЕЗОПАСНЫЙ НЕЗАВИСИМЫЙ ПОТОК ДЛЯ ПОЛЛИНГА
+def start_polling_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    async def poll():
+        # Стираем вебхук навсегда, чтобы включить режим прямого прослушивания
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot)
+    loop.run_until_complete(poll())
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if bot:
-        try:
-            # Чистим старые сессии перед привязкой
-            asyncio.run(bot.delete_webhook(drop_pending_updates=True))
-            asyncio.run(bot.set_webhook(url=f"{RENDER_URL}/webhook"))
-            logging.info("Сетевой мост Webhook успешно развернут!")
-        except Exception as e:
-            logging.error(f"Ошибка шлюза: {e}")
+        # Запускаем поллинг в отдельном вечном потоке, который хостинг не сможет закрыть
+        Thread(target=start_polling_thread, daemon=True).start()
+        logging.info("Фоновый поток Поллинга успешно активирован!")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
