@@ -213,15 +213,15 @@ def start_polling_thread():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     async def poll():
-        # Стираем вебхук навсегда, чтобы включить режим прямого прослушивания
         await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+        # handle_signals=False отключает перехват сигналов и убирает ошибку потоков
+        await dp.start_polling(bot, handle_signals=False)
     loop.run_until_complete(poll())
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if bot:
-        # Запускаем поллинг в отдельном вечном потоке, который хостинг не сможет закрыть
         Thread(target=start_polling_thread, daemon=True).start()
         logging.info("Фоновый поток Поллинга успешно активирован!")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
