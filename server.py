@@ -8,21 +8,15 @@ from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from threading import Thread
 
-# Включаем логирование ошибок для панели Render
 logging.basicConfig(level=logging.INFO)
 
-# ИНИЦИАЛИЗАЦИЯ НАСТРОЕК
 TOKEN = os.environ.get("BOT_TOKEN")
 NGROK_URL = "https://ashram-game.onrender.com"
-
-if not TOKEN:
-    logging.error("КРИТИЧЕСКАЯ ОШИБКА: Переменная BOT_TOKEN не найдена в настройках Environment на Render!")
 
 bot = Bot(token=TOKEN) if TOKEN else None
 dp = Dispatcher()
 app = Flask(__name__)
 
-# ЕДИНАЯ БАЗА ДАННЫХ В ПАМЯТИ ДЛЯ РАБОТЫ НА RENDER
 CONN = sqlite3.connect(":memory:", check_same_thread=False)
 
 def init_db():
@@ -47,19 +41,15 @@ def db_get_player(user_id):
         cursor.execute("INSERT INTO players (user_id) VALUES (?)", (user_id,))
         CONN.commit()
         return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
-    return {"race": row[0], "prana": int(row[1]), "room_lvl": int(row[2])}
+    return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
     cursor = CONN.cursor()
-    if race is not None: 
-        cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
-    if prana is not None: 
-        cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
-    if room_lvl is not None: 
-        cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
+    if race is not None: cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
+    if prana is not None: cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
+    if room_lvl is not None: cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
     CONN.commit()
 
-# НАСТРОЙКА КРОСС-ДОМЕННЫХ ЗАПРОСОВ (CORS) ДЛЯ ТЕЛЕФОНОВ
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -67,7 +57,6 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     return response
 
-# ВЕБ-МАРШРУТЫ ДЛЯ МИНИ-ПРИЛОЖЕНИЯ
 @app.route('/<path:filename>')
 def serve_static(filename):
     if filename.endswith(('.jpg', '.jpeg', '.png', '.webp', '.html', '.js', '.css')):
@@ -76,31 +65,27 @@ def serve_static(filename):
 
 @app.route("/")
 def home():
-    if request.method == "OPTIONS": 
-        return make_response("", 200)
+    if request.method == "OPTIONS": return make_response("", 200)
     response = make_response(send_from_directory(os.getcwd(), "index.html"))
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
 
 @app.route("/get_profile", methods=["GET", "OPTIONS"])
 def get_profile():
-    if request.method == "OPTIONS": 
-        return make_response("", 200)
+    if request.method == "OPTIONS": return make_response("", 200)
     user_id = int(request.args.get("user_id", 999))
     return jsonify(db_get_player(user_id))
 
 @app.route("/save_race", methods=["POST", "OPTIONS"])
 def save_race():
-    if request.method == "OPTIONS": 
-        return make_response("", 200)
+    if request.method == "OPTIONS": return make_response("", 200)
     data = request.json
     db_update_player(int(data["user_id"]), race=data["race"])
     return jsonify({"status": "success"})
 
 @app.route("/upgrade_room", methods=["POST", "OPTIONS"])
 def upgrade_room():
-    if request.method == "OPTIONS": 
-        return make_response("", 200)
+    if request.method == "OPTIONS": return make_response("", 200)
     data = request.json
     user_id = int(data["user_id"])
     p = db_get_player(user_id)
@@ -110,57 +95,6 @@ def upgrade_room():
         db_update_player(user_id, prana=new_prana, room_lvl=new_lvl)
         return jsonify({"prana": new_prana, "room_lvl": new_lvl})
     return jsonify({"error": "No prana"}), 400
-
-# МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
-MULTILEVEL_QUESTS = {
-    "djinn_1": {
-        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
-        "buttons": [["Гора Меру (Сумеру)", "ans_right_djinn_2"], ["Древо Иггдрасиль", "ans_wrong"], ["Змей Шеша-нага", "ans_wrong"]]
-    },
-    "djinn_2": {
-        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 2): Дым Пуран\n\nПространство очищается, но Лярва Алкоголя пытается заключить с вами контр-контракт. Мустафа хитро улыбается:\n«Проверим её знание Шримад Бхагаватам. Какая аватара Господа Вишну приняла облик гигантского вепря, чтобы поднять Землю (Бхуми) со дна океана Гарбходака, куда её сбросил демон Хираньякша?»",
-        "buttons": [["Матсья (Рыба)", "ans_wrong"], ["Вараха (Вепрь)", "ans_right_djinn_3"], ["Курма (Черепаха)", "ans_wrong"]]
-    },
-    "djinn_3": {
-        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 3): Oasis Времени\n\nЛярва вижжит. Мустафа достает древний свиток:\n«Финальный рубеж. Махабхарата гласит, что время в материальном мире циклично. Какова общая продолжительность всех четырех Юг (Сатья, Трета, Двапара и Кали), составляющих вместе одну Маха-югу в исчислении лет смертных?»",
-        "buttons": [["4 320 000 лет", "ans_right_final"], ["1 200 000 лет", "ans_wrong"], ["100 000 000 лет", "ans_wrong"]]
-    },
-    "mag_1": {
-        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 1): Матрица Координации\n\nАфанасий направляет советскую отвертку на разрыв ЛЭП УМПО. Его три головы произносят в унисон:\n«Для стабилизации гравитационного луча нужен нумерологический код. Из скольких глав состоит Бхагавад-Гита, поведанная Кришной Арджуне на поле Курукшетра?»",
-        "buttons": [["12 глав", "ans_wrong"], ["18 глав", "ans_right_mag_2"], ["108 глав", "ans_wrong"]]
-    },
-    "mag_2": {
-        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 2): Гравитация Древних\n\nДроны-черепа фиксируют новые астральные вспышки. Левая глава Афанасия (Память) кричит:\n«Вспомни Махабхарату! Кто был отцом пяти Пандавов (Юдхиштхиры, Бхимы, Арджуны, Накулы и Сахадевы) согласно земной родословной, чье проклятие заставило его уйти в леса?»",
-        "buttons": [["Царь Панду", "ans_right_mag_3"], ["Царь Дхритараштра", "ans_wrong"], ["Мудрец Вьясадева", "ans_wrong"]]
-    },
-    "mag_3": {
-        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 3): Код Создателя\n\nРазрыв ЛЭП почти затянут, гравитация колеблется. Афанасий требует высший ответ:\n«Ведическая космология описывает Творца нашей Вселенной — Брахму. Но у него есть предел жизни. Сколько длится один день Брахмы (Калпа) в Тонком Плане, равный одной дневной манифестации творения?»",
-        "buttons": [["1000 Маха-юг (4.32 млрд лет)", "ans_right_final"], ["100 Маха-юг", "ans_wrong"], ["1 миллион лет", "ans_wrong"]]
-    },
-    "nag_1": {
-        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сккозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его тело?»",
-        "buttons": [["Его стопы стали золотыми", "ans_wrong"], ["Его горло стало синим (Нилакантха)", "ans_right_nag_2"], ["Открылся четвертый глаз", "ans_wrong"]]
-    },
-    "nag_2": {
-        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 2): Хроники Змей\n\nЗмеи на плечах Гавриила расправляют капюшоны. Из Хроник Акаши материализуется дух змеиного царя:\n«Кто из великих змеев (Нагов) ведической космологии служит вечным ложем для Господа Вишну в Причинном океане и держит на своих бесчисленных головах все планеты материального мира?»",
-        "buttons": [["Васуки", "ans_wrong"], ["Такшака", "ans_wrong"], ["Ананта-Шеша", "ans_right_nag_3"]]
-    },
-    "nag_3": {
-        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 3): Алтарь Шивы\n\nМногоножки Забвения рассеиваются. Гавриил подводит вас к тонкоматериальному Алтарю:\n«Финальный вопрос Шива Пураны. Назовите священную ночь, когда преданные бодрствуют и медитируют на трансцендентный танец Господа Шивы (Тандава), разрушающий невежество?»",
-        "buttons": [["Махашиваратри", "ans_right_final"], ["Дивали", "ans_wrong"], ["Холи", "ans_wrong"]]
-    },
-    "leviafan_1": {
-        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 1): Абсолютный Контроль\n\nДык воет на луну, его крио-доспехи гудят, защищая души Николая и Весемира:\n«Разум должен быть холодным, как Абсолютный Ноль! Ответь на вопрос из Вишну Пураны. Назови великого преданного мальчика, которого Нараяна защищал от всех смертельных казней его собственного отца Хираньякашипу?»",
-        "buttons": [["Махараджа Прахлада", "ans_right_leviafan_2"], ["Царевич Дхрува", "ans_wrong"], ["Принц Бхишма", "ans_wrong"]]
-    },
-    "leviafan_2": {
-        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 2): Огненная Опора\n\nДык бьет трезубцем фазового сдвига, замораживая стаю Лярв. Но из тени УМПО выходит яростный демон:\n«Вишну Пурана и Шримад Бхагаватам описывают, что для спасения Прахлады Всевышний явился в ужасающей, невиданной ранее форме Получеловека-Полульва. Как зовут эту аватару?»",
-        "buttons": [["Ваманадева", "ans_wrong"], ["Нрисимхадева", "ans_right_leviafan_3"], ["Парашурама", "ans_wrong"]]
-    },
-    "leviafan_3": {
-        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 3): Океан Абсолюта\n\nПромзона Уфы затихает, окутанная чистой энергией. Дык ухмыляется своей безумной улыбкой:\n«И последнее. Ведическая космология говорит, что наша Вселенная плавает в безбрежном океане материи, подобно пузырьку. Как называется этот первичный материальный океан, где возлежит Маха-Вишну, выдыхающий мириады вселенных?»",
-
-    # МАСШТАБНАЯ МНОГОУРОВНЕВАЯ СИСТЕМА КВЕСТОВ
 MULTILEVEL_QUESTS = {
     "djinn_1": {
         "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
@@ -199,7 +133,7 @@ MULTILEVEL_QUESTS = {
         "buttons": [["Махашиваратри", "ans_right_final"], ["Дивали", "ans_wrong"], ["Холи", "ans_wrong"]]
     },
     "leviafan_1": {
-        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 1): Абсолютный Контроль\n\nДык воет на луну, его крио-доспехи гудят, защищая души Николая и Весемира:\n«Разум должен быть холодным, как Абсолютного Ноля! Ответь на вопрос из Вишну Пураны. Назови великого преданного мальчика, которого Нараяна защищал от всех смертельных казней его собственного отца Хираньякашипу?»",
+        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 1): Абсолютный Контроль\n\nДык воет на луну, его крио-доспехи гудят, защищая души Николая и Весемира:\n«Разум должен быть холодным, как Абсолютный Ноль! Ответь на вопрос из Вишну Пураны. Назови великого преданного мальчика, которого Нараяна защищал от всех смертельных казней его собственного отца Хираньякашипу?»",
         "buttons": [["Махараджа Прахлада", "ans_right_leviafan_2"], ["Царевич Дхрува", "ans_wrong"], ["Принц Бхишма", "ans_wrong"]]
     },
     "leviafan_2": {
@@ -211,7 +145,6 @@ MULTILEVEL_QUESTS = {
         "buttons": [["Причинный океан (Каранаводака)", "ans_right_final"], ["Молочный океан", "ans_wrong"], ["Соленый океан", "ans_wrong"]]
     }
 }
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     p = db_get_player(message.from_user.id)
@@ -275,10 +208,8 @@ async def back_to_main(callback: types.CallbackQuery):
     ])
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
-# АСИНХРОННЫЙ ПОТОК ДЛЯ РАБОТЫ ТЕЛЕГРАМ-БОТА В ОБЛАКЕ
 def start_bot_in_thread():
-    if not bot: 
-        return
+    if not bot: return
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     async def run_bot():
@@ -294,4 +225,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
