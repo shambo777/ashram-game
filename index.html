@@ -20,7 +20,7 @@
             text-align: center;
             margin: 0;
             padding: 15px;
-            padding-bottom: 80px; /* Отступ для нижнего меню */
+            padding-bottom: 80px;
         }
         .container {
             max-width: 420px;
@@ -71,7 +71,6 @@
         }
         button:disabled { background: #333 !important; color: #777 !important; }
 
-        /* Нижнее меню переключения вкладок */
         .nav-bar {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: #111118; border-top: 2px solid var(--border-color);
@@ -85,16 +84,15 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <!-- ЭКРАН ВЫБОРА РАСЫ -->
     <div id="race-screen" class="race-select-screen">
         <h1>Выберите вашу Расу</h1>
         <div class="subtitle">Привязка аккаунта к Системе Bholenath Sanga</div>
-        <button class="race-btn" onclick="selectRace('djinn')"><span class="race-icon">🔮</span><div><strong>Джинн Мустафа</strong></div></button>
-        <button class="race-btn" onclick="selectRace('mag')"><span class="race-icon">🧠</span><div><strong>Маг Афанасий</strong></div></button>
-        <button class="race-btn" onclick="selectRace('nag')"><span class="race-icon">🐍</span><div><strong>Наг Гавриил</strong></div></button>
-        <button class="race-btn" onclick="selectRace('leviafan')"><span class="race-icon">🔥</span><div><strong>Левиафан Дык</strong></div></button>
+        <button class="race-btn" data-race="djinn"><span class="race-icon">🔮</span><div><strong>Джинн Мустафа</strong></div></button>
+        <button class="race-btn" data-race="mag"><span class="race-icon">🧠</span><div><strong>Маг Афанасий</strong></div></button>
+        <button class="race-btn" data-race="nag"><span class="race-icon">🐍</span><div><strong>Наг Гавриил</strong></div></button>
+        <button class="race-btn" data-race="leviafan"><span class="race-icon">🔥</span><div><strong>Левиафан Дык</strong></div></button>
     </div>
 
     <!-- ОСНОВНОЙ ИГРОВОЙ ЭКРАН -->
@@ -111,7 +109,7 @@
                 <div id="room-level" style="color:#ffbc42; margin: 5px 0;">Уровень: 1</div>
                 <div id="status-text" style="font-size: 13px; color: #aaa;">Статус: Готова к трансформации</div>
                 <div id="countdown" class="timer">00:00:00</div>
-                <button id="upgrade-btn" class="action-btn" onclick="startUpgrade()">Модернизировать Базу (-50 Праны)</button>
+                <button id="upgrade-btn" class="action-btn">Модернизировать Базу (-50 Праны)</button>
             </div>
         </div>
 
@@ -125,23 +123,21 @@
                 <div style="font-size:12px; margin: 5px 0; color: #bbb;">Фокусирует гравитационные лучи. Увеличивает силу праны.</div>
                 <div id="item-lvl" style="color: #00ffcc; font-weight: bold; margin-bottom: 10px;">Текущая ковка: Уровень 1</div>
                 <div id="item-countdown" class="timer">00:00:00</div>
-                <button id="item-btn" class="action-btn" onclick="startItemUpgrade()">Запустить ковку артефакта (-70 Праны)</button>
+                <button id="item-btn" class="action-btn">Запустить ковку артефакта (-70 Праны)</button>
             </div>
         </div>
 
         <!-- НИЖНЯЯ НАВИГАЦИЯ -->
         <div class="nav-bar">
-            <button id="btn-tab-base" class="nav-btn active" onclick="switchTab('base')">🏰 Келья</button>
-            <button id="btn-tab-items" class="nav-btn" onclick="switchTab('items')">📦 Снаряжение</button>
+            <button id="btn-tab-base" class="nav-btn active">🏰 Келья</button>
+            <button id="btn-tab-items" class="nav-btn">📦 Снаряжение</button>
         </div>
     </div>
 </div>
-
 <script>
-       const tg = window.Telegram.WebApp;
+    const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Безопасное считывание ID для любых смартфонов
     let userId = 777;
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
         userId = tg.initDataUnsafe.user.id;
@@ -158,6 +154,19 @@
         leviafan: { name: "Дык", tag: "Раса: Левиафан", room: "❄️ Крио-Камера Абсолютного Нуля", img: "dyk.jpg", bg: "#140a07", card: "#1f110c", border: "#d35400", accent: "#c0392b" }
     };
 
+    // Привязываем клики к кнопкам выбора персонажей книги
+    document.querySelectorAll('.race-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const race = this.getAttribute('data-race');
+            selectRace(race);
+        });
+    });
+
+    document.getElementById('btn-tab-base').addEventListener('click', () => switchTab('base'));
+    document.getElementById('btn-tab-items').addEventListener('click', () => switchTab('items'));
+    document.getElementById('upgrade-btn').addEventListener('click', startUpgrade);
+    document.getElementById('item-btn').addEventListener('click', startItemUpgrade);
+
     function switchTab(tabName) {
         document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -166,8 +175,8 @@
         document.getElementById(`btn-tab-${tabName}`).classList.add('active');
     }
 
-    // ИСПОЛЬЗУЕМ ОТНОСИТЕЛЬНЫЙ ПУТЬ ДЛЯ ОБХОДА И БЛОКИРОВОК СМАРТФОНОВ
-    fetch(`/get_profile?user_id=${userId}`)
+    // Первичный запрос профиля при входе
+    fetch('/get_profile?user_id=' + userId)
         .then(res => res.json())
         .then(data => {
             document.getElementById('prana-val').innerText = data.prana;
@@ -178,7 +187,7 @@
         }).catch(err => console.error(err));
 
     function selectRace(race) {
-        fetch(`/save_race`, {
+        fetch('/save_race', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({user_id: userId, race: race})
@@ -223,7 +232,7 @@
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 document.getElementById('countdown').innerText = "00:00:00";
-                fetch(`/upgrade_room`, {
+                fetch('/upgrade_room', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({user_id: userId})
@@ -253,7 +262,7 @@
             if (timeLeft <= 0) {
                 clearInterval(itemInterval);
                 document.getElementById('item-countdown').innerText = "00:00:00";
-                fetch(`/upgrade_room`, {
+                fetch('/upgrade_room', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({user_id: userId})
@@ -266,7 +275,6 @@
             }
         }, 1000);
     }
-
 </script>
 </body>
 </html>
