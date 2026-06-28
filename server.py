@@ -6,8 +6,8 @@ from flask import Flask, make_response, send_from_directory, request, jsonify
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from asgiref.sync import async_to_sync
 
-# Включаем логирование ошибок
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -17,7 +17,6 @@ bot = Bot(token=TOKEN) if TOKEN else None
 dp = Dispatcher()
 app = Flask(__name__)
 
-# БАЗА ДАННЫХ В ПАМЯТИ
 CONN = sqlite3.connect(":memory:", check_same_thread=False)
 
 def init_db():
@@ -66,23 +65,27 @@ def serve_static(filename):
 
 @app.route("/")
 def home():
+    if request.method == "OPTIONS": return make_response("", 200)
     response = make_response(send_from_directory(os.getcwd(), "index.html"))
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
 
-@app.route("/get_profile")
+@app.route("/get_profile", methods=["GET", "OPTIONS"])
 def get_profile():
+    if request.method == "OPTIONS": return make_response("", 200)
     user_id = int(request.args.get("user_id", 999))
     return jsonify(db_get_player(user_id))
 
-@app.route("/save_race", methods=["POST"])
+@app.route("/save_race", methods=["POST", "OPTIONS"])
 def save_race():
+    if request.method == "OPTIONS": return make_response("", 200)
     data = request.json
     db_update_player(int(data["user_id"]), race=data["race"])
     return jsonify({"status": "success"})
 
-@app.route("/upgrade_room", methods=["POST"])
+@app.route("/upgrade_room", methods=["POST", "OPTIONS"])
 def upgrade_room():
+    if request.method == "OPTIONS": return make_response("", 200)
     data = request.json
     user_id = int(data["user_id"])
     p = db_get_player(user_id)
@@ -93,36 +96,134 @@ def upgrade_room():
         return jsonify({"prana": new_prana, "room_lvl": new_lvl})
     return jsonify({"error": "No prana"}), 400
 
-# ЭТОТ МАРШРУТ ПРИНИМАЕТ ЗАПРОСЫ ОТ СЕРВЕРОВ TELEGRAM И МГНОВЕННО БУДИТ RENDER
 @app.route("/webhook", methods=["POST"])
 def webhook_handler():
     if bot:
-        # Передаем входящий пакет данных напрямую в aiogram
-        update = types.Update.model_validate(request.json, context={"bot": bot})
-        asyncio.run(dp.feed_update(bot, update))
+        try:
+            update = types.Update.model_validate(request.json, context={"bot": bot})
+            async_to_sync(dp.feed_update)(bot, update)
+        except Exception as e:
+            logging.error(f"Ошибка шлюза: {e}")
     return "OK", 200
-
+MULTILEVEL_QUESTS = {
+    "djinn_1": {
+        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 1): Иллюзии Маха-Майи\n\nВы патрулируете чердак заброшенного НИИ. Мустафа выпускает кольцо дыма из Кальяна Сатьи:\n«Астральные паразиты утверждают, что наша Бху-мандала — плоский диск. Давай разобьем морок Шримад Бхагаватам. Назови космическую ось, пронизывающую все планетные системы Вселенной?»",
+        "buttons": [["Гора Меру (Сумеру)", "ans_right_djinn_2"], ["Древо Иггдрасиль", "ans_wrong"], ["Змей Шеша-нага", "ans_wrong"]]
+    },
+    "djinn_2": {
+        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 2): Дым Пуран\n\nПространство очищается, но Лярва Алкоголя пытается заключить с вами контр-контракт. Мустафа хитро улыбается:\n«Проверим её знание Шримад Бхагаватам. Какая аватара Господа Вишну приняла облик гигантского вепря, чтобы поднять Землю (Бхуми) со дна океана Гарбходака, куда её сбросил демон Хираньякша?»",
+        "buttons": [["Матсья (Рыба)", "ans_wrong"], ["Вараха (Вепрь)", "ans_right_djinn_3"], ["Курма (Черепаха)", "ans_wrong"]]
+    },
+    "djinn_3": {
+        "text": "🔮 ДЕЖУРСТВО С МУСТАФОЙ (Уровень 3): Oasis Времени\n\nЛярва вижжит. Мустафа достает древний свиток:\n«Финальный рубеж. Махабхарата гласит, что время в материальном мире циклично. Какова общая продолжительность всех четырех Юг (Сатья, Трета, Двапара и Кали), составляющих вместе одну Маха-югу в исчислении лет смертных?»",
+        "buttons": [["4 320 000 лет", "ans_right_final"], ["1 200 000 лет", "ans_wrong"], ["100 000 000 лет", "ans_wrong"]]
+    },
+    "mag_1": {
+        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 1): Матрица Координации\n\nАфанасий направляет советскую отвертку на разрыв ЛЭП УМПО. Его три головы произносят в унисон:\n«Для стабилизации гравитационного луча нужен нумерологический код. Из скольких глав состоит Бхагавад-Гита, поведанная Кришной Арджуне на поле Курукшетра?»",
+        "buttons": [["12 глав", "ans_wrong"], ["18 глав", "ans_right_mag_2"], ["108 глав", "ans_wrong"]]
+    },
+    "mag_2": {
+        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 2): Гравитация Древних\n\nДроны-черепа фиксируют новые астральные вспышки. Левая глава Афанасия (Память) кричит:\n«Вспомни Махабхарату! Кто был отцом пяти Пандавов (Юдхиштхиры, Бхимы, Арджуны, Накулы и Сахадевы) согласно земной родословной, чье проклятие заставило его уйти в леса?»",
+        "buttons": [["Царь Панду", "ans_right_mag_3"], ["Царь Дхритараштра", "ans_wrong"], ["Мудрец Вьясадева", "ans_wrong"]]
+    },
+    "mag_3": {
+        "text": "🧠 ДЕЖУРСТВО С АФАНАСИЕМ (Уровень 3): Код Создателя\n\nРазрыв ЛЭП почти затянут, гравитация колеблется. Афанасий требует высший ответ:\n«Ведическая космология описывает Творца нашей Вселенной — Брахму. Но у него есть предел жизни. Сколько длится один день Брахмы (Калпа) в Тонком Плане, равный одной дневной манифестации творения?»",
+        "buttons": [["1000 Маха-юг (4.32 млрд лет)", "ans_right_final"], ["100 Маха-юг", "ans_wrong"], ["1 миллион лет", "ans_wrong"]]
+    },
+    "nag_1": {
+        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его тело?»",
+        "buttons": [["Его стопы стали золотыми", "ans_wrong"], ["Его горло стало синим (Нилакантха)", "ans_right_nag_2"], ["Открылся четвертый глаз", "ans_wrong"]]
+    },
+    "nag_2": {
+        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 2): Хроники Змей\n\nЗмеи на плечах Гавриила расправляют капюшоны. Из Хроник Акаши материализуется дух змеиного царя:\n«Кто из великих змеев (Нагов) ведической космологии служит вечным ложем для Господа Вишну в Причинном океане и держит на своих бесчисленных головах все планеты материального мира?»",
+        "buttons": [["Васуки", "ans_wrong"], ["Такшака", "ans_wrong"], ["Ананта-Шеша", "ans_right_nag_3"]]
+    },
+    "nag_3": {
+        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 3): Алтарь Шивы\n\nМногоножки Забвения рассеиваются. Гавриил подводит вас к тонкоматериальному Алтарю:\n«Финальный вопрос Шива Пураны. Назовите священную ночь, когда преданные бодрствуют и медитируют на трансцендентный танец Господа Шивы (Тандава), разрушающий невежество?»",
+        "buttons": [["Махашиваратри", "ans_right_final"], ["Дивали", "ans_wrong"], ["Холи", "ans_wrong"]]
+    },
+    "leviafan_1": {
+        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 1): Абсолютный Контроль\n\nДык воет на луну, его крио-доспехи гудят, защищая души Николая и Весемира:\n«Разум должен быть холодным, как Абсолютный Ноль! Ответь на вопрос из Вишну Пураны. Назови великого преданного мальчика, которого Нараяна защищал от всех смертельных казней его собственного отца Хираньякашипу?»",
+        "buttons": [["Махараджа Прахлада", "ans_right_leviafan_2"], ["Царевич Дхрува", "ans_wrong"], ["Принц Бхишма", "ans_wrong"]]
+    },
+    "leviafan_2": {
+        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 2): Огненная Опора\n\nДык бьет трезубцем фазового сдвига, замораживая стаю Лярв. Но из тени УМПО выходит яростный демон:\n«Вишну Пурана и Шримад Бхагаватам описывают, что для спасения Прахлады Всевышний явился в ужасающей, невиданной ранее форме Получеловека-Полульва. Как зовут эту аватару?»",
+        "buttons": [["Ваманадева", "ans_wrong"], ["Нрисимхадева", "ans_right_leviafan_3"], ["Парашурама", "ans_wrong"]]
+    },
+    "leviafan_3": {
+        "text": "🔥 ДЕЖУРСТВО С ДЫКОМ (Уровень 3): Океан Абсолюта\n\nПромзона Уфы затихает, окутанная чистой энергией. Дык ухмыляется своей безумной улыбкой:\n«И последнее. Ведическая космология говорит, что наша Вселенная плавает в безбрежном океане материи, подобно пузырьку. Как называется этот первичный материальный океан, где возлежит Маха-Вишну, выдыхающий мириады вселенных?»",
+        "buttons": [["Причинный океан (Каранаводака)", "ans_right_final"], ["Молочный океан", "ans_wrong"], ["Соленый океан", "ans_wrong"]]
+    }
+}
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     p = db_get_player(message.from_user.id)
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=RENDER_URL))]
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=RENDER_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство", callback_data="start_duty")]
     ])
     await message.answer(
-        f"Приветствую! Система 'Bholenath Sanga' активна.\n"
-        f"Ваш текущий баланс: {p['prana']} Праны.\n\n"
-        "Нажмите на кнопку ниже, чтобы запустить Mini App:",
+        f"Приветствую, {message.from_user.first_name}!\n\nСистема 'Bholenath Sanga' активна.\n"
+        f"Ваш текущий баланс: {p['prana']} Праны. Уровень кельи: {p['room_lvl']}.\n\nВыберите действие:",
         reply_markup=kb
     )
+
+@dp.callback_query(lambda c: c.data == "start_duty")
+async def start_duty_menu(callback: types.CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔮 Джинн Мустафа", callback_data="runquest_djinn_1")],
+        [InlineKeyboardButton(text="🧠 Маг Афанасий", callback_data="runquest_mag_1")],
+        [InlineKeyboardButton(text="🐍 Наг Гавриил", callback_data="runquest_nag_1")],
+        [InlineKeyboardButton(text="🔥 Левиафан Дык", callback_data="runquest_leviafan_1")]
+    ])
+    await callback.message.edit_text("С кем из хранителей Системы вы разделите ночное дежурство?", reply_markup=kb)
+
+@dp.callback_query(lambda c: c.data.startswith("runquest_"))
+async def handle_quests(callback: types.CallbackQuery):
+    quest_key = callback.data.replace("runquest_", "")
+    quest_data = MULTILEVEL_QUESTS.get(quest_key)
+    if quest_data:
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=t, callback_data=f"ans_{c}")] for t, c in quest_data["buttons"]
+        ])
+        await callback.message.edit_text(quest_data["text"], reply_markup=kb)
+
+@dp.callback_query(lambda c: c.data.startswith("ans_"))
+async def handle_answers(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    action = callback.data.replace("ans_", "")
+    
+    if action == "wrong":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Попробовать снова", callback_data="start_duty")]])
+        await callback.message.edit_text("❌ ИСКАЖЕНИЕ СИСТЕМЫ...\n\nОтвет неверен. Ум поддался иллюзиям Кали-Юги. Попробуйте дежурство заново!", reply_markup=kb)
+    
+    elif action.startswith("right_") and (action.endswith("_2") or action.endswith("_3")):
+        next_step = action.replace("right_", "")
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Продолжить дежурство ➡️", callback_data=f"runquest_{next_step}")]])
+        await callback.message.edit_text("✨ ИСТИНА ОТКРЫТА! Сектор подпространства временно чист. Но паразиты наступают дальше...", reply_markup=kb)
+        
+    elif action == "right_final":
+        p = db_get_player(user_id)
+        new_prana = p["prana"] + 300
+        db_update_player(user_id, prana=new_prana)
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="В штаб Ашрама 🏰", callback_data="back_main")]])
+        await callback.message.edit_text(f"🎉 ПОЛНАЯ ПОБЕДА НАД ПОДПЛАНАМИ!\n\nВы полностью очистили сектор ЛЭП УМПО, проявив ведические знания. Система BSS стабилизирована.\n\nНаграда: +300 Праны!\nБаланс: {new_prana} Праны.", reply_markup=kb)
+
+@dp.callback_query(lambda c: c.data == "back_main")
+async def back_to_main(callback: types.CallbackQuery):
+    p = db_get_player(callback.from_user.id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏰 Войти в Ашрам", web_app=WebAppInfo(url=RENDER_URL))],
+        [InlineKeyboardButton(text="⚔️ Начать дежурство", callback_data="start_duty")]
+    ])
+    await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if bot:
-        # Автоматическая привязка вебхука при старте сервера
         try:
             asyncio.run(bot.set_webhook(url=f"{RENDER_URL}/webhook", drop_pending_updates=True))
-            logging.info("Сетевой мост Webhook успешно активирован в Telegram!")
+            logging.info("Сетевой мост Webhook успешно развернут!")
         except Exception as e:
-            logging.error(f"Ошибка активации Webhook: {e}")
-            
+            logging.error(f"Ошибка шлюза: {e}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
