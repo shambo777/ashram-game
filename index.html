@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bholenath Sanga System - Ашрам</title>
+    <script src="https://telegram.org"></script>
     <style>
         :root {
             --bg-color: #0d0d13;
@@ -98,7 +99,7 @@
     <div id="game-screen" class="game-screen">
         <h1 id="hero-name">Имя</h1>
         <div id="race-tag" class="subtitle">Раса</div>
-        <div class="prana-badge">🧬 Баланс: <span id="prana-val">100</span> Праны</div>
+        <div class="prana-badge">🧬 Баланс: <span id="prana-val">0</span> Праны</div>
         
         <!-- ВКЛАДКА 1: БАЗА -->
         <div id="tab-base" class="tab-content active-tab">
@@ -134,6 +135,14 @@
     </div>
 </div>
 <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    let userId = 777;
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+        userId = tg.initDataUnsafe.user.id;
+    }
+
     let currentRace = '';
     let timerInterval;
     let itemInterval;
@@ -145,7 +154,7 @@
         leviafan: { name: "Дык", tag: "Раса: Левиафан", room: "❄️ Крио-Камера Абсолютного Нуля", img: "dyk.jpg", bg: "#140a07", card: "#1f110c", border: "#d35400", accent: "#c0392b" }
     };
 
-    // Принудительные слушатели кликов по кнопкам рас
+    // Принудительные слушатели кликов
     document.querySelectorAll('.race-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const race = this.getAttribute('data-race');
@@ -166,8 +175,26 @@
         document.getElementById(`btn-tab-${tabName}`).classList.add('active');
     }
 
+    // БОЕВОЙ ЗАПРОС К СЕРВЕРУ ЧЕРЕЗ ОТНОСИТЕЛЬНЫЙ ПУТЬ
+    fetch('/get_profile?user_id=' + userId)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('prana-val').innerText = data.prana;
+            document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
+            if(data.race && data.race !== "Не выбрана") { 
+                loadRaceInterface(data.race); 
+            }
+        }).catch(err => console.error(err));
+
     function selectRace(race) {
-        loadRaceInterface(race);
+        fetch('/save_race', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, race: race})
+        })
+        .then(res => res.json())
+        .then(() => loadRaceInterface(race))
+        .catch(err => console.error(err));
     }
 
     function loadRaceInterface(race) {
@@ -188,6 +215,9 @@
     }
 
     function startUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 50) { alert("Недостаточно Праны!"); return; }
+
         const btn = document.getElementById('upgrade-btn');
         const status = document.getElementById('status-text');
         btn.disabled = true;
@@ -202,14 +232,24 @@
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 document.getElementById('countdown').innerText = "00:00:00";
-                document.getElementById('room-level').innerText = "Уровень: 2";
-                status.innerText = "Модернизация завершена!";
-                btn.disabled = false;
+                fetch('/upgrade_room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: userId})
+                }).then(res => res.json()).then(data => {
+                    document.getElementById('prana-val').innerText = data.prana;
+                    document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
+                    status.innerText = "Модернизация завершена!";
+                    btn.disabled = false;
+                }).catch(err => console.error(err));
             }
         }, 1000);
     }
 
     function startItemUpgrade() {
+        const currentPrana = parseInt(document.getElementById('prana-val').innerText);
+        if (currentPrana < 70) { alert("Недостаточно Праны для кузницы!"); return; }
+
         const btn = document.getElementById('item-btn');
         btn.disabled = true;
 
@@ -222,9 +262,16 @@
             if (timeLeft <= 0) {
                 clearInterval(itemInterval);
                 document.getElementById('item-countdown').innerText = "00:00:00";
-                document.getElementById('item-lvl').innerText = "Текущая ковка: Уровень 2 (Мощность +20%)";
-                alert("Артефакт успешно перекован в кузнице Ашрама!");
-                btn.disabled = false;
+                fetch('/upgrade_room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: userId})
+                }).then(res => res.json()).then(data => {
+                    document.getElementById('prana-val').innerText = data.prana;
+                    document.getElementById('item-lvl').innerText = "Текущая ковка: Уровень 2 (Мощность +20%)";
+                    alert("Артефакт успешно перекован в кузнице Ашрама!");
+                    btn.disabled = false;
+                }).catch(err => console.error(err));
             }
         }, 1000);
     }
