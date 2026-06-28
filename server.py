@@ -19,8 +19,12 @@ app = Flask(__name__)
 
 CONN = sqlite3.connect(":memory:", check_same_thread=False)
 
+# ИСТИННАЯ БАЗА ДАННЫХ НА ДИСКЕ ХОСТИНГА (НЕ СТИРАЕТСЯ)
+DB_PATH = "ashram_game.db"
+
 def init_db():
-    cursor = CONN.cursor()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS players (
             user_id INTEGER PRIMARY KEY,
@@ -29,26 +33,35 @@ def init_db():
             room_lvl INTEGER DEFAULT 1
         )
     """)
-    CONN.commit()
+    conn.commit()
+    conn.close()
 
 init_db()
 
 def db_get_player(user_id):
-    cursor = CONN.cursor()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     cursor.execute("SELECT race, prana, room_lvl FROM players WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if not row:
         cursor.execute("INSERT INTO players (user_id) VALUES (?)", (user_id,))
-        CONN.commit()
-        return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
+        conn.commit()
+        row = ('Не выбрана', 100, 1)
+    conn.close()
     return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
-    cursor = CONN.cursor()
-    if race is not None: cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
-    if prana is not None: cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
-    if room_lvl is not None: cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
-    CONN.commit()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    if race is not None: 
+        cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
+    if prana is not None: 
+        cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
+    if room_lvl is not None: 
+        cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
+    conn.commit()
+    conn.close()
+
 
 @app.after_request
 def add_cors_headers(response):
@@ -82,6 +95,7 @@ def save_race():
     data = request.json
     db_update_player(int(data["user_id"]), race=data["race"])
     return jsonify({"status": "success"})
+
 
 @app.route("/upgrade_room", methods=["POST", "OPTIONS"])
 def upgrade_room():
