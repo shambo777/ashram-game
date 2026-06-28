@@ -175,27 +175,19 @@
         document.getElementById(`btn-tab-${tabName}`).classList.add('active');
     }
 
-    // Первичный запрос профиля при входе
-    fetch('/get_profile?user_id=' + userId)
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('prana-val').innerText = data.prana;
-            document.getElementById('room-level').innerText = "Уровень: " + data.room_lvl;
-            if(data.race && data.race !== "Не выбрана") { 
-                loadRaceInterface(data.race); 
-            }
-        }).catch(err => console.error(err));
+      // ТЕСТОВЫЙ РЕЖИМ: Отключаем запросы к серверу
+    // Имитируем, что с сервера пришел чистый профиль нового игрока
+    console.log("Автономный режим BSS запущен для ID:", userId);
+    document.getElementById('prana-val').innerText = "100";
+    document.getElementById('room-level').innerText = "Уровень: 1";
 
+    // Изменяем функцию выбора расы, чтобы она переключала экраны мгновенно
     function selectRace(race) {
-        fetch('/save_race', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user_id: userId, race: race})
-        })
-        .then(res => res.json())
-        .then(() => loadRaceInterface(race))
-        .catch(err => console.error(err));
+        console.log("Клик сработал! Выбрана раса:", race);
+        // Запускаем перекраску интерфейса и открытие кельи без ожидания сервера
+        loadRaceInterface(race); 
     }
+
 
     function loadRaceInterface(race) {
         currentRace = race;
