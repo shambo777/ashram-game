@@ -15,18 +15,11 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 app = Flask(__name__)
 
-# НАСТРОЙКА CORS ДЛЯ БЕЗОПАСНОСТИ ТЕЛЕФОНОВ
-@app.after_request
-def add_cors_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
-    return response
+# ЕДИНАЯ ГЛОБАЛЬНАЯ БАЗА ДАННЫХ В ПАМЯТИ ДЛЯ ОБХОДА БЛОКИРОВОК RENDER
+CONN = sqlite3.connect(":memory:", check_same_thread=False)
 
-# ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ
 def init_db():
-    conn = sqlite3.connect("ashram_game.db")
-    cursor = conn.cursor()
+    cursor = CONN.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS players (
             user_id INTEGER PRIMARY KEY,
@@ -35,31 +28,37 @@ def init_db():
             room_lvl INTEGER DEFAULT 1
         )
     """)
-    conn.commit()
-    conn.close()
+    CONN.commit()
 
 init_db()
 
 def db_get_player(user_id):
-    conn = sqlite3.connect("ashram_game.db")
-    cursor = conn.cursor()
+    cursor = CONN.cursor()
     cursor.execute("SELECT race, prana, room_lvl FROM players WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if not row:
         cursor.execute("INSERT INTO players (user_id) VALUES (?)", (user_id,))
-        conn.commit()
-        row = ('Не выбрана', 100, 1)
-    conn.close()
+        CONN.commit()
+        return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
     return {"race": row[0], "prana": row[1], "room_lvl": row[2]}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
-    conn = sqlite3.connect("ashram_game.db")
-    cursor = conn.cursor()
-    if race is not None: cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
-    if prana is not None: cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
-    if room_lvl is not None: cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
-    conn.commit()
-    conn.close()
+    cursor = CONN.cursor()
+    if race is not None: 
+        cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
+    if prana is not None: 
+        cursor.execute("UPDATE players SET prana = ? WHERE user_id = ?", (prana, user_id))
+    if room_lvl is not None: 
+        cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
+    CONN.commit()
+
+# НАСТРОЙКА CORS ДЛЯ БЕЗОПАСНОСТИ ТЕЛЕФОНОВ
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    return response
 
 # ВЕБ-МАРШРУТЫ ДЛЯ СТАТИКИ И КАРТИНОК
 @app.route('/<path:filename>')
@@ -93,11 +92,12 @@ def save_race():
 def upgrade_room():
     if request.method == "OPTIONS": return make_response("", 200)
     data = request.json
-    p = db_get_player(int(data["user_id"]))
+    user_id = int(data["user_id"])
+    p = db_get_player(user_id)
     if p["prana"] >= 50:
         new_prana = p["prana"] - 50
         new_lvl = p["room_lvl"] + 1
-        db_update_player(int(data["user_id"]), prana=new_prana, room_lvl=new_lvl)
+        db_update_player(user_id, prana=new_prana, room_lvl=new_lvl)
         return jsonify({"prana": new_prana, "room_lvl": new_lvl})
     return jsonify({"error": "No prana"}), 400
 
@@ -183,7 +183,7 @@ MULTILEVEL_QUESTS = {
         "buttons": [["1000 Маха-юг (4.32 млрд лет)", "ans_right_final"], ["100 Маха-юг", "ans_wrong"], ["1 миллион лет", "ans_wrong"]]
     },
     "nag_1": {
-        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его body?»",
+        "text": "🐍 ДЕЖУРСТВО С ГАВРИИЛОМ (Уровень 1): Спираль Памяти\n\nИзумруд на посохе Гавриила закручивает реальность в Спираль Фибоначчи. Вокруг шипит смог Кали-Юги:\n«Чтобы пройти сквозь кольца времени, ответь на вопрос из Шива Пураны. Махадев Шива выпил страшный яд Халахала ради спасения мира от уничтожения во время пахтания океана. Какую память об этом хранит Его тело?»",
         "buttons": [["Его стопы стали золотыми", "ans_wrong"], ["Его горло стало синим (Нилакантха)", "ans_right_nag_2"], ["Открылся четвертый глаз", "ans_wrong"]]
     },
     "nag_2": {
