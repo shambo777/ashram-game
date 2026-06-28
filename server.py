@@ -49,7 +49,7 @@ def db_get_player(user_id):
         conn.close()
         return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
     conn.close()
-    # Берем каждый элемент строго по его номеру в базе данных, исключая кортежи
+    # ИСПРАВЛЕНО: Извлекаем данные строго по индексам из кортежа
     return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
@@ -68,6 +68,7 @@ def db_update_player(user_id, race=None, prana=None, room_lvl=None):
         cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (int(room_lvl), user_id))
     conn.commit()
     conn.close()
+
 
 
 
