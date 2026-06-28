@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Считываем настройки окружения Render
 TOKEN = os.environ.get("BOT_TOKEN")
-RENDER_URL = "https://onrender.com"
+RENDER_URL = "https://ashram-game.onrender.com"
 
 bot = Bot(token=TOKEN) if TOKEN else None
 dp = Dispatcher()
