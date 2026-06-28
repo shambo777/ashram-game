@@ -44,15 +44,23 @@ def db_get_player(user_id):
     cursor.execute("SELECT race, prana, room_lvl FROM players WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if not row:
-        cursor.execute("INSERT INTO players (user_id) VALUES (?)", (user_id,))
+        cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
         conn.commit()
-        row = ('Не выбрана', 100, 1)
+        conn.close()
+        return {"race": "Не выбрана", "prana": 100, "room_lvl": 1}
     conn.close()
+    # Возвращаем чистые типы данных: текст, число, число
     return {"race": str(row[0]), "prana": int(row[1]), "room_lvl": int(row[2])}
 
 def db_update_player(user_id, race=None, prana=None, room_lvl=None):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # Проверяем существование игрока перед обновлением
+    cursor.execute("SELECT user_id FROM players WHERE user_id = ?", (user_id,))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO players (user_id, race, prana, room_lvl) VALUES (?, 'Не выбрана', 100, 1)", (user_id,))
+        conn.commit()
+        
     if race is not None: 
         cursor.execute("UPDATE players SET race = ? WHERE user_id = ?", (race, user_id))
     if prana is not None: 
@@ -61,6 +69,7 @@ def db_update_player(user_id, race=None, prana=None, room_lvl=None):
         cursor.execute("UPDATE players SET room_lvl = ? WHERE user_id = ?", (room_lvl, user_id))
     conn.commit()
     conn.close()
+
 
 
 @app.after_request
