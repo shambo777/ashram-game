@@ -281,15 +281,29 @@ async def back_to_main(callback: types.CallbackQuery):
     ])
     await callback.message.edit_text(f"Система 'Bholenath Sanga' активна.\nВаш баланс: {p['prana']} Праны.", reply_markup=kb)
 
-# ГЛОБАЛЬНЫЙ ЗАПУСК С УЧЕТОМ ТРЕБОВАНИЙ ХОСТИНГА RENDER
-async def main():
-    print("Запуск сервера Ашрама...")
-    port = int(os.environ.get("PORT", 5000))
-    Thread(target=lambda: app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)).start()
+# ИСПРАВЛЕННЫЙ ПАРАЛЛЕЛЬНЫЙ ЗАПУСК ДЛЯ ОБЛАКА RENDER
+def start_bot_in_thread():
+    # Создаем новый независимый поток для Telegram-бота
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
-    await bot.delete_webhook(drop_pending_updates=True)
-    print("Бот BSS успешно запущен в облаке Render!")
-    await dp.start_polling(bot)
+    async def run_bot():
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("Бот BSS успешно подключился к серверам Telegram!")
+        await dp.start_polling(bot)
+        
+    loop.run_until_complete(run_bot())
+
+async def main():
+    print("Запуск инфраструктуры Ашрама...")
+    port = int(os.environ.get("PORT", 5000))
+    
+    # 1. Сначала запускаем бота в отдельном безопасном потоке
+    Thread(target=start_bot_in_thread, daemon=True).start()
+    
+    # 2. Затем запускаем Flask-сервер в основном потоке (этого требует Render)
+    print("Веб-сервер Flask развернут на порту:", port)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
     asyncio.run(main())
