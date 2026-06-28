@@ -97,25 +97,26 @@ def upgrade_room():
     return jsonify({"error": "No prana"}), 400
 
 @app.route("/webhook", methods=["POST"])
-# ИЗОЛИРОВАННЫЙ ФОНОВЫЙ ПОТОК ДЛЯ ОБРАБОТКИ СИГНАЛОВ TELEGRAM
+# АВТОНОМНЫЙ ШЛЮЗ ОБРАБОТКИ СИГНАЛОВ
 def run_async_update(update_json):
-    # Создаем вечный изолированный цикл для этой конкретной команды
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
-    async def process():
+    try:
         update = types.Update.model_validate(update_json, context={"bot": bot})
-        await dp.feed_update(bot, update)
-        
-    loop.run_until_complete(process())
-    loop.close()
+        loop.run_until_complete(dp.feed_update(bot, update))
+    except Exception as e:
+        logging.error(f"Ошибка внутри асинхронного цикла: {e}")
+    finally:
+        loop.close()
 
 @app.route("/webhook", methods=["POST"])
 def webhook_handler():
     if bot:
-        # Запускаем обработку квеста в фоновом потоке, чтобы Flask мгновенно освобождал Event Loop
-        Thread(target=run_async_update, args=(request.json,), daemon=True).start()
+        # Берем чистый JSON и передаем его в поток напрямую через лямбда-выражение
+        data_json = request.json
+        Thread(target=lambda: run_async_update(data_json), daemon=True).start()
     return "OK", 200
+
 
 MULTILEVEL_QUESTS = {
     "djinn_1": {
